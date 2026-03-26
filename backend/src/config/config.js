@@ -1,7 +1,7 @@
 /**
  * * File cấu hình kết nối với Database Mysql
  */
-require("dotenv").config();
+require("dotenv").config({ path: __dirname + "/../../.env" });
 
 module.exports = {
   development: {
