@@ -27,6 +27,7 @@
   "devDependencies": {
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
+    "docx": "^9.6.1",
     "nodemon": "^3.1.14",
     "sequelize-cli": "^6.6.5"
   }

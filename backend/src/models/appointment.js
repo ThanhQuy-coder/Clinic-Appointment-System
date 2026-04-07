@@ -65,6 +65,18 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DATE,
         allowNull: true,
       },
+      IsEmergency: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+      },
+      CancelledAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
+      CancelReason: {
+        type: DataTypes.STRING(500),
+        allowNull: true,
+      },
     },
     {
       sequelize,
