@@ -1,0 +1,31 @@
+const { Appointment } = require('../models');
+const queueManager = require('../queues/queueManager');
+
+async function replayAppointments() {
+  try {
+    console.log('Replaying appointments to queue...');
+
+    // Lấy các appointment cần đưa vào queue
+    const appointments = await Appointment.findAll({
+      where: {
+        Status: ['Pending'],
+      },
+    });
+
+    console.log(`Found ${appointments.length} pending appointments`);
+
+    for (const appt of appointments) {
+      await queueManager.addJob("NEW_APPOINTMENT", {
+        doctorId: appt.DoctorId,
+        patientId: appt.PatientId,
+      }, {jobId: `appointment-${appt.AppointmentId}`}
+    );
+    }
+
+    console.log('Replay completed');
+  } catch (error) {
+    console.error('Replay failed:', error);
+  }
+}
+
+module.exports = { replayAppointments };

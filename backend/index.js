@@ -5,7 +5,13 @@ const compression = require("compression");
 const morgan = require("morgan");
 const { sequelize } = require("./src/models/index.js");
 const routes = require("./src/routes/index.js");
-const { errorHandler, notFoundHandler } = require("./src/middlewares/error.middleware.js");
+const {
+  errorHandler,
+  notFoundHandler,
+} = require("./src/middlewares/error.middleware.js");
+const http = require("http");
+const socketServer = require("./src/sockets/socketServer.js");
+const { replayAppointments } = require("./src/scripts/replayAppointmentsToQueue.js");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -24,6 +30,13 @@ app.use("/api", routes);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
+// Kết nối redis
+const redis = require("./src/config/redis.js");
+
+// Khởi tạo socketServer
+const server = http.createServer(app);
+socketServer.init(server);
+
 // Kiểm tra kết nối với DB
 sequelize
   .authenticate()
@@ -34,10 +47,19 @@ sequelize
     console.error("Error connect database: ", err);
   });
 
-app.get("/", (req, res) => {
-  res.send("Hello World!");
+// Kiểm tra kết nối IORedis
+redis.on("connect", () => {
+  console.log("Redis connected");
+});
+redis.on("error", (err) => {
+  console.error("Redis error:", err);
 });
 
-app.listen(PORT, () => {
+// ! Sử dụng để test
+replayAppointments()
+  .then(() => console.log("Replay appointments finished"))
+  .catch(err => console.error("Replay error:", err));
+
+server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
