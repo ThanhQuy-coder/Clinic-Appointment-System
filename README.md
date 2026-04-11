@@ -2,7 +2,7 @@
 
 **Hệ thống đặt lịch khám bệnh / Quản lý phòng khám**
 
-![Clinic Appointment System Banner](https://via.placeholder.com/1200x400.png?text=Clinic+Appointment+System)  
+![Clinic Appointment System Banner](https://static.vecteezy.com/system/resources/previews/016/928/590/non_2x/online-doctor-appointment-system-flat-banner-template-telehealth-services-iot-poster-leaflet-printable-color-designs-editable-flyer-page-with-text-space-vector.jpg)  
 _(Thay bằng ảnh chụp màn hình đẹp của hệ thống nếu có)_
 
 ## Giới thiệu
@@ -25,15 +25,15 @@ Mục tiêu: Giảm thời gian chờ đợi, tối ưu hóa lịch làm việc 
 
 ## Công nghệ sử dụng
 
-| Phần             | Công nghệ                                                      |
-| ---------------- | -------------------------------------------------------------- |
-| Frontend         | _React / Vue / Next.js / HTML + TailwindCSS_                   |
-| Backend          | _Node.js + Express / Laravel / Spring Boot / Django_           |
-| Database         | _MySQL / PostgreSQL / MongoDB_                                 |
-| Authentication   | _JWT / Laravel Sanctum / Firebase Auth_                        |
-| State Management | _Redux / Zustand / Vuex / Context API_                         |
-| UI Library       | _Tailwind CSS / Ant Design / Material UI_                      |
-| Tích hợp khác    | _Email (Nodemailer), VNPay/MoMo (nếu có), SMS (Twilio nếu có)_ |
+| Phần             | Công nghệ                      |
+| ---------------- | ------------------------------ |
+| Frontend         | _Next.js / HTML + TailwindCSS_ |
+| Backend          | _Node.js + Express_            |
+| Database         | _MySQL_                        |
+| Authentication   | _JWT_                          |
+| State Management | _..._                          |
+| UI Library       | _Tailwind CSS_                 |
+| Tích hợp khác    | _..._                          |
 
 ## Cài đặt & Chạy dự án (Local)
 
