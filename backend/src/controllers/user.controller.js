@@ -70,6 +70,9 @@ const login = async (req, res) => {
     if (!user) {
         return unauthorizedResponse(res, 'Invalid email or password');
     }
+    console.log(user.PasswordHash);
+    
+    console.log(Password);
     
     // Verify password
     const isPasswordValid = await comparePassword(Password, user.PasswordHash);

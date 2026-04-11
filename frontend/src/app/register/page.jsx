@@ -2,8 +2,14 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import api from '@/lib/axios';
+import toast, { Toaster } from 'react-hot-toast';
 
 export default function Register() {
+    const router = useRouter();
+    const [isLoading, setIsLoading] = useState(false);
+
     const [formData, setFormData] = useState({
         fullName: '', phone: '', email: '', password: '', confirmPassword: ''
     });
@@ -12,14 +18,42 @@ export default function Register() {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    const handleRegister = (e) => {
+    const handleRegister = async (e) => {
         e.preventDefault();
+
         if (formData.password !== formData.confirmPassword) {
             alert("Mật khẩu xác nhận không khớp!");
             return;
         }
-        // Xử lý logic gọi API đăng ký ở đây
-        console.log('Dữ liệu đăng ký:', formData);
+        setIsLoading(true);
+        const loadingToast = toast.loading('Đang xác thực...');
+
+        try {
+            // axios call api register
+            const response = await api.post('/users/register', { 
+                FullName: formData.fullName, 
+                Phone: formData.phone, 
+                Email: formData.email, 
+                Password: formData.password }
+            );
+
+            const { token, user } = response.data.data;
+            
+            // Save local storage
+            localStorage.setItem('accessToken', token);
+            
+            toast.success(`Chào mừng ${user?.name}!`, { id: loadingToast });
+
+            setTimeout(() => {
+                router.push('/');
+            }, 1000);
+
+        } catch (error) {
+            const message = error.response?.data?.message || 'Đăng ký thất bại. Thử lại sau!';
+            toast.error(message, { id: loadingToast });
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -40,13 +74,13 @@ export default function Register() {
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Họ và tên *</label>
                                 <input type="text" name="fullName" required onChange={handleChange}
                                     className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#0e6add] outline-none transition-all"
-                                    placeholder="VD: Nguyễn Văn A" />
+                                    placeholder="VD: Nguyễn Văn A" disabled={isLoading} />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Số điện thoại *</label>
                                 <input type="tel" name="phone" required onChange={handleChange}
                                     className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#0e6add] outline-none transition-all"
-                                    placeholder="VD: 0912345678" />
+                                    placeholder="VD: 0912345678" disabled={isLoading} />
                             </div>
                         </div>
 
@@ -54,7 +88,7 @@ export default function Register() {
                             <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
                             <input type="email" name="email" required onChange={handleChange}
                                 className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#0e6add] outline-none transition-all"
-                                placeholder="VD: nguyenvan@email.com" />
+                                placeholder="VD: nguyenvan@email.com" disabled={isLoading} />
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -62,18 +96,23 @@ export default function Register() {
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu *</label>
                                 <input type="password" name="password" required onChange={handleChange}
                                     className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#0e6add] outline-none transition-all"
-                                    placeholder="••••••••" />
+                                    placeholder="••••••••" disabled={isLoading} />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Xác nhận mật khẩu *</label>
                                 <input type="password" name="confirmPassword" required onChange={handleChange}
                                     className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#0e6add] outline-none transition-all"
-                                    placeholder="••••••••" />
+                                    placeholder="••••••••" disabled={isLoading} />
                             </div>
                         </div>
 
                         <button type="submit" className="w-full bg-[#0e6add] text-white font-bold py-3.5 rounded-xl hover:bg-blue-700 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 mt-4">
-                            Đăng ký tài khoản
+                            {isLoading ? (
+                                <>
+                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                    Đang xử lý...
+                                </>
+                            ) : 'Đăng ký tài khoản'}
                         </button>
                     </form>
 

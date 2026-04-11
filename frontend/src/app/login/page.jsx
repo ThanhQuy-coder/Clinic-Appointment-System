@@ -2,15 +2,50 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import api from '@/lib/axios';
+import toast, { Toaster } from 'react-hot-toast';
 
 export default function Login() {
+    const router = useRouter();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
-    const handleLogin = (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault();
-        // Xử lý logic gọi API đăng nhập ở đây
-        console.log('Đăng nhập với:', { email, password });
+
+        /**
+         * Client-side Validation basic
+         */
+        if (!email || !password) {
+            return toast.error('Vui lòng điền đầy đủ thông tin!');
+        }
+
+        setIsLoading(true); // Start loading
+        const loadingToast = toast.loading('Đang xác thực...');
+
+        try {
+            // axios call api login
+            const response = await api.post('/users/login', { Email: email, Password: password });
+
+            const { token, user } = response.data.data;
+            
+            // Save local storage 
+            localStorage.setItem('accessToken', token);
+            
+            toast.success(`Chào mừng ${user?.name || 'trở lại'}!`, { id: loadingToast });
+
+            setTimeout(() => {
+                router.push('/');
+            }, 1000);
+
+        } catch (error) {
+            const message = error.response?.data?.message || 'Đăng nhập thất bại. Thử lại sau!';
+            toast.error(message, { id: loadingToast });
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -49,7 +84,9 @@ export default function Login() {
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
                             <input
-                                type="email" required
+                                type="email"
+                                disabled={isLoading}
+                                required
                                 value={email} onChange={(e) => setEmail(e.target.value)}
                                 className="w-full px-5 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#0e6add] focus:border-transparent outline-none transition-all"
                                 placeholder="VD: nguyenvan@email.com"
@@ -63,6 +100,7 @@ export default function Login() {
                             </div>
                             <input
                                 type="password" required
+                                disabled={isLoading}
                                 value={password} onChange={(e) => setPassword(e.target.value)}
                                 className="w-full px-5 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#0e6add] focus:border-transparent outline-none transition-all"
                                 placeholder="••••••••"
@@ -70,7 +108,12 @@ export default function Login() {
                         </div>
 
                         <button type="submit" className="w-full bg-[#0e6add] text-white font-bold py-3.5 rounded-xl hover:bg-blue-700 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
-                            Đăng nhập
+                            {isLoading ? (
+                                <>
+                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                    Đang xử lý...
+                                </>
+                            ) : 'Đăng nhập'}
                         </button>
                     </form>
 
