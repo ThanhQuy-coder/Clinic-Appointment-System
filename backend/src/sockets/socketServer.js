@@ -24,6 +24,7 @@ class SocketServer {
       socket.on("join", ({ doctorId, userId }) => {
         if (doctorId) socket.join(`doctor-${doctorId}`);
         if (userId) socket.join(`user-${userId}`);
+        console.log(`Client user-${userId} join room: doctor-${doctorId}` );
       });
 
       socket.on("disconnect", () => {

@@ -40,9 +40,8 @@ const calculateWaitTime = async (doctorId, slotStart) => {
     const appointments = await Appointment.findAll({
         where: {
             DoctorId: doctorId,
-            StartTime: { [Op.between]: [dayStart, dayEnd] },
             Status: { [Op.in]: SLOT_OCCUPYING_STATUSES },
-            StartTime: { [Op.lt]: slotStart },
+            StartTime: { [Op.between]: [dayStart, dayEnd], [Op.lt]: slotStart },
         },
         order: [['StartTime', 'ASC']],
     });

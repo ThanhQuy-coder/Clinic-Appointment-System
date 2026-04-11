@@ -24,11 +24,11 @@ module.exports = {
 
   async down (queryInterface, Sequelize) {
     await queryInterface.bulkDelete('Doctors', {
-      DoctorId: [
+      DoctorId: {[Op.in]:[
         'd98f253c-5465-4acc-9ee2-5471269c85fe',
         '00e19264-63be-4592-b2c4-625e0abee762',
         'cfb26a49-221e-4868-831b-4250644488a4',
-      ]
+      ]} 
     }, {});
   }
 };

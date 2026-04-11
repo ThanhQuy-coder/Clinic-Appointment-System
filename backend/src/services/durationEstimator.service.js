@@ -1,5 +1,6 @@
-const { Appointment, Op } = require('../models/index.js');
+const { Appointment } = require('../models/index.js');
 const { Sequelize } = require('sequelize');
+const { Op } = require('sequelize');
 
 const MIN_SAMPLES = 3;
 

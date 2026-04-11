@@ -56,9 +56,11 @@ redis.on("error", (err) => {
 });
 
 // ! Sử dụng để test
-replayAppointments()
-  .then(() => console.log("Replay appointments finished"))
-  .catch(err => console.error("Replay error:", err));
+if (process.env.REPLAY_APPOINTMENTS === 'true') {
+  replayAppointments()
+    .then(() => console.log("Replay appointments finished"))
+    .catch(err => console.error("Replay error:", err));
+}
 
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

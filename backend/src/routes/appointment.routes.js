@@ -2,7 +2,9 @@ const express = require('express');
 const router = express.Router();
 const appointmentService = require('../services/appointment.service');
 const { successResponse, createdResponse, notFoundResponse, badRequestResponse, conflictResponse, errorResponse } = require('../utils/response.js');
+const queueManager = require("../queues/queueManager.js")
 
+// API: GET api/appointments/suggestions
 router.get('/suggestions', async (req, res) => {
     try {
         const schedulerService = require('../services/smartScheduler.service');
@@ -13,6 +15,7 @@ router.get('/suggestions', async (req, res) => {
     }
 });
 
+// API: POST api/appointments/
 router.post('/', async (req, res) => {
     try {
         const { PatientId, DoctorId, StartTime, EndTime, AppointmentType, IsEmergency } = req.body;
@@ -45,6 +48,7 @@ router.post('/', async (req, res) => {
     }
 });
 
+// API: GET api/appointments/
 router.get('/', async (req, res) => {
     try {
         const { PatientId, DoctorId, Date, Status, page, limit } = req.query;
@@ -57,6 +61,7 @@ router.get('/', async (req, res) => {
     }
 });
 
+// API: GET api/appointments/:id
 router.get('/:id', async (req, res) => {
     try {
         const appointment = await appointmentService.getAppointmentById(req.params.id);
@@ -69,6 +74,7 @@ router.get('/:id', async (req, res) => {
     }
 });
 
+// API: Patch api/appointments/:id/cancel
 router.patch('/:id/cancel', async (req, res) => {
     try {
         const { reason } = req.body;
@@ -92,6 +98,8 @@ router.patch('/:id/cancel', async (req, res) => {
     }
 });
 
+// API: Patch api/appointments/:id/status
+// ! Nếu bệnh nhân đã hủy lịch cancel
 router.patch('/:id/status', async (req, res) => {
     try {
         const { status, actualStartTime, actualEndTime } = req.body;
@@ -122,6 +130,7 @@ router.patch('/:id/status', async (req, res) => {
     }
 });
 
+// API: Patch api/appointments/:id/arrival
 router.patch('/:id/arrival', async (req, res) => {
     try {
         const appointment = await appointmentService.confirmArrival(req.params.id);
