@@ -8,11 +8,11 @@ async function replayAppointments() {
     // Lấy các appointment cần đưa vào queue
     const appointments = await Appointment.findAll({
       where: {
-        Status: ['Pending'],
+        Status: ['Confirmed', 'InProgress'],
       },
     });
 
-    console.log(`Found ${appointments.length} pending appointments`);
+    console.log(`Found ${appointments.length} appointments`);
 
     for (const appt of appointments) {
       await queueManager.addJob("NEW_APPOINTMENT", {

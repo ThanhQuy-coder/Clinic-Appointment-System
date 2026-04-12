@@ -4,7 +4,7 @@
 
 const { Worker } = require("bullmq");
 const connection = require("../config/redis");
-const queueService = require("../services/queue.service");
+const queueService = require("../services/queue.service.js");
 const emitter = require("../utils/emitter");
 
 // worker lắng nghe appointment-queue
@@ -15,9 +15,9 @@ const worker = new Worker(
 
     // Xử lý từng loại job
     switch (name) {
-      case "NEXT_PATIENT":
+      case "NEXT_PATIENT":        
         const result = await queueService.handleNext(data.doctorId);
-
+        
         emitter.emitQueueUpdate(data.doctorId, result);
         break;
 

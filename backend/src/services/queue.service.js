@@ -1,88 +1,103 @@
 const redis = require("../config/redis.js");
 
 class QueueService {
-  getKey(doctorId) {
-    return `queue:doctor:${doctorId}`;
+  getWaitingKey(doctorId) {
+    return `queue:doctor:${doctorId}:waiting`;
   }
 
-  // Thêm vào queue
+  getActiveKey(doctorId) {
+    return `queue:doctor:${doctorId}:active`;
+  }
+
+  /**
+   * THÊM VÀO HÀNG ĐỢI
+   */
   async addToQueue({ doctorId, patientId }) {
-    const key = this.getKey(doctorId);
+    const waitingKey = this.getWaitingKey(doctorId);
+    const score = Date.now();
 
-    const score = Date.now(); // FIFO
+    const patientData = JSON.stringify({
+      patientId,
+      status: "Confirmed",
+      createdAt: score,
+    });
 
-    await redis.zadd(
-      key,
-      score,
-      JSON.stringify({
-        patientId,
-        status: "WAITING",
-      }),
-    );
+    // Thêm trực tiếp vào Sorted Set, không cần đọc ra/ghi lại
+    await redis.zadd(waitingKey, score, patientData);
 
     return this.getQueueState(doctorId);
   }
 
-  // Next patient
+  /**
+   * CHUYỂN BỆNH NHÂN TIẾP THEO
+   */
   async handleNext(doctorId) {
-    const key = this.getKey(doctorId);
+    const waitingKey = this.getWaitingKey(doctorId);
+    const activeKey = this.getActiveKey(doctorId);
 
-    // Lấy toàn bộ queue
-    const items = await redis.zrange(key, 0, -1);
+    const nextItems = await redis.zrange(waitingKey, 0, 0);
 
-    let parsed = items.map((i) => JSON.parse(i));
-
-    // DONE current
-    const current = parsed.find((q) => q.status === "IN_PROGRESS");
-    if (current) current.status = "DONE";
-
-    // NEXT
-    const next = parsed.find((q) => q.status === "WAITING");
-    if (next) next.status = "IN_PROGRESS";
-
-    // Ghi lại Redis (overwrite)
-    await redis.del(key);
-
-    for (let i = 0; i < parsed.length; i++) {
-      await redis.zadd(key, i, JSON.stringify(parsed[i]));
+    if (nextItems.length === 0) {
+      // Nếu hàng đợi trống, xóa bệnh nhân đang khám cũ (nếu có)
+      await redis.del(activeKey);
+      return this.getQueueState(doctorId);
     }
 
-    return this.buildResponse(parsed);
+    const patientRaw = nextItems[0];
+    const patientData = JSON.parse(patientRaw);
+    patientData.status = "InProgress";
+
+    const multi = redis.multi();
+
+    multi.zrem(waitingKey, patientRaw);
+
+    multi.set(activeKey, JSON.stringify(patientData));
+
+    await multi.exec();
+
+    return this.getQueueState(doctorId);
   }
 
-  // Remove
+  /**
+   * XÓA BỆNH NHÂN KHỎI HÀNG ĐỢI
+   */
   async removeFromQueue({ doctorId, patientId }) {
-    const key = this.getKey(doctorId);
+    const waitingKey = this.getWaitingKey(doctorId);
 
-    const items = await redis.zrange(key, 0, -1);
-    const filtered = items
-      .map((i) => JSON.parse(i))
-      .filter((q) => q.patientId !== patientId);
+    // Tìm phần tử có patientId tương ứng trong Sorted Set
+    const items = await redis.zrange(waitingKey, 0, -1);
+    const targetMember = items.find(
+      (i) => JSON.parse(i).patientId === patientId,
+    );
 
-    await redis.del(key);
-
-    for (let i = 0; i < filtered.length; i++) {
-      await redis.zadd(key, i, JSON.stringify(filtered[i]));
+    if (targetMember) {
+      // Chỉ xóa duy nhất phần tử đó, O(log(N)) thay vì xóa cả List
+      await redis.zrem(waitingKey, targetMember);
     }
 
-    return this.buildResponse(filtered);
+    return this.getQueueState(doctorId);
   }
 
+  /**
+   * LẤY TRẠNG THÁI HIỆN TẠI
+   */
   async getQueueState(doctorId) {
-    const key = this.getKey(doctorId);
+    const waitingKey = this.getWaitingKey(doctorId);
+    const activeKey = this.getActiveKey(doctorId);
 
-    const items = await redis.zrange(key, 0, -1);
-    const parsed = items.map((i) => JSON.parse(i));
+    // Lấy song song cả danh sách chờ và người đang khám
+    const [waitingItems, activeItem] = await Promise.all([
+      redis.zrange(waitingKey, 0, -1),
+      redis.get(activeKey),
+    ]);
 
-    return this.buildResponse(parsed);
-  }
-
-  buildResponse(queue) {
-    const waiting = queue.filter((q) => q.status === "WAITING");
+    const waitingList = waitingItems.map((i) => JSON.parse(i));
+    const current = activeItem ? JSON.parse(activeItem) : null;
 
     return {
-      queue,
-      remaining: waiting.length,
+      current,
+      waiting: waitingList,
+      totalWaiting: waitingList.length,
     };
   }
 }
