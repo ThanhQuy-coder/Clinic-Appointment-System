@@ -2,33 +2,38 @@
 import { useEffect, useState, useRef } from "react";
 import { io } from "socket.io-client";
 import { Timer, Users, Bell, Clock, XCircle, ChevronRight } from "lucide-react";
-import api from '@/lib/axios';
+import api from "@/lib/axios";
 
-const SOCKET_SERVER_URL = process.env.URL_SOCKET || "http://localhost:3001"; 
+const SOCKET_SERVER_URL = process.env.URL_SOCKET || "http://localhost:3001";
 
 export default function LiveQueuePage() {
   const socketRef = useRef(null);
   const [queueData, setQueueData] = useState({
-    currentNumber: 0,
-    yourNumber: 0,
-    waitTime: 0,
+    currentNumber: 0, // Số đang kêu
+    yourNumber: 0, // Vị trí hiện tại (Số tt của bệnh nhân)
+    numberAhead: 0, // Số lượng khám ở phía trước
+    waitTime: 0, // Thời gian chờ
   });
 
+  // ! test
   const userId = "106bb68e-edb6-45f6-a4a1-afa51efdc653";
   const doctorId = "d98f253c-5465-4acc-9ee2-5471269c85fe";
+  const appointmentId = 7;
 
   useEffect(() => {
+    if (!appointmentId) return;
     const fetchInitialStatus = async () => {
       try {
         const response = await api.get(`/queue/queue-status`, {
-          params: { userId, doctorId }
+          params: { appointmentId },
         });
-        
+
         // Cập nhật state với dữ liệu thực từ Redis
         setQueueData({
           currentNumber: response.data.currentNumber,
           yourNumber: response.data.yourNumber,
-          waitTime: response.data.estimatedTime,
+          numberAhead: response.data.numberAhead,
+          waitTime: response.data.waitTime,
         });
       } catch (error) {
         console.error("Lỗi khi fetch dữ liệu ban đầu:", error);
@@ -46,35 +51,31 @@ export default function LiveQueuePage() {
       socket.emit("join", { userId, doctorId });
     });
 
-    socket.on("queue_update", (data) => {
-      setQueueData(prev => ({
-        ...prev,
-        currentNumber: data.currentNumber,
-        waitTime: data.estimatedTime
-      }));
+    socket.on("queue:update", (data) => {
+      setQueueData(data);
     });
 
     return () => {
       socket.disconnect();
+      socketRef.current = null;
     };
-  }, []);
+  }, [appointmentId, userId, doctorId]);
 
-  // Dùng Axios để gửi yêu cầu "Hủy" hoặc "Đến muộn"
-  const handleCancel = async () => {
-    try {
-      await api.post(`${SOCKET_SERVER_URL}/api/cancel-queue`, { userId, doctorId });
-      alert("Đã hủy lịch hẹn");
-    } catch (error) {
-      console.error("Lỗi khi hủy:", error);
-    }
-  };
+  const safeCurrent =
+    typeof queueData.currentNumber === "number" ? queueData.currentNumber : 0;
 
-  const peopleAhead = queueData.yourNumber - queueData.currentNumber;
+  const progress =
+    queueData.yourNumber && safeCurrent
+      ? Math.min(100, Math.round((safeCurrent / queueData.yourNumber) * 100))
+      : 0;
+
+  const peopleAhead = Number.isFinite(queueData.numberAhead)
+    ? queueData.numberAhead
+    : 0;
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 flex flex-col items-center">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100">
-        
         {/* Header */}
         <div className="bg-blue-600 p-6 text-white text-center">
           <h1 className="text-xl font-bold">Hàng Đợi Trực Tuyến</h1>
@@ -83,17 +84,28 @@ export default function LiveQueuePage() {
 
         {/* Main Content */}
         <div className="p-6 space-y-8">
-          
           {/* Queue Status */}
           <div className="flex justify-around items-center py-4">
             <div className="text-center">
-              <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Đang gọi số</p>
-              <div className="text-4xl font-black text-blue-600">{queueData.currentNumber}</div>
+              <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">
+                Đang gọi số
+              </p>
+              <div className="text-4xl font-black text-blue-600">
+                {typeof queueData.currentNumber === "number"
+                  ? queueData.currentNumber
+                  : "Chưa khám"}
+              </div>
             </div>
             <div className="h-12 w-[1px] bg-slate-200"></div>
             <div className="text-center">
-              <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">Số của bạn</p>
-              <div className="text-4xl font-black text-slate-800">{queueData.yourNumber}</div>
+              <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">
+                Số của bạn
+              </p>
+              <div className="text-4xl font-black text-slate-800">
+                {queueData.yourNumber === 0
+                  ? "Đang khám"
+                  : (queueData.yourNumber ?? "--")}
+              </div>
             </div>
           </div>
 
@@ -102,12 +114,17 @@ export default function LiveQueuePage() {
             <div className="bg-orange-50 p-4 rounded-2xl flex flex-col items-center border border-orange-100">
               <Users className="text-orange-500 mb-2" size={24} />
               <span className="text-slate-600 text-xs">Phía trước</span>
-              <span className="font-bold text-lg text-orange-700">{peopleAhead > 0 ? peopleAhead : 0} người</span>
+              <span className="font-bold text-lg text-orange-700">
+                {peopleAhead} người
+              </span>
             </div>
             <div className="bg-blue-50 p-4 rounded-2xl flex flex-col items-center border border-blue-100">
               <Timer className="text-blue-500 mb-2" size={24} />
               <span className="text-slate-600 text-xs">Chờ dự kiến</span>
-              <span className="font-bold text-lg text-blue-700">{queueData.waitTime} phút</span>
+              <span className="font-bold text-lg text-blue-700">
+                {Number.isFinite(queueData.waitTime) ? queueData.waitTime : 0}{" "}
+                phút
+              </span>
             </div>
           </div>
 
@@ -115,12 +132,13 @@ export default function LiveQueuePage() {
           <div className="space-y-2">
             <div className="flex justify-between text-xs font-medium text-slate-500">
               <span>Tiến độ hàng đợi</span>
-              <span>{Math.round((queueData.currentNumber / queueData.yourNumber) * 100)}%</span>
+              <span>{progress}%</span>
             </div>
+
             <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
-              <div 
+              <div
                 className="bg-blue-500 h-full transition-all duration-500 ease-out"
-                style={{ width: `${(queueData.currentNumber / queueData.yourNumber) * 100}%` }}
+                style={{ width: `${progress}%` }}
               ></div>
             </div>
           </div>
@@ -136,7 +154,6 @@ export default function LiveQueuePage() {
               Hủy lịch hẹn
             </button>
           </div>
-
         </div>
 
         {/* Footer Note */}

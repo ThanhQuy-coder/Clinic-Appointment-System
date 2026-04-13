@@ -53,6 +53,23 @@ class QueueController {
       jobId: job.id,
     });
   }
+
+  async queueStatus(req, res) {
+    const { appointmentId } = req.query;
+
+    try {
+      const job = await queueManager.getQueueStatus(appointmentId);
+
+      return res.json({
+        currentNumber: job.currentNumber,
+        yourNumber: job.yourNumber,
+        numberAhead: job.numberAhead,
+        waitTime: job.waitTime,
+      });
+    } catch (err) {
+      return res.status(400).json({ message: err.message });
+    }
+  }
 }
 
 module.exports = new QueueController();

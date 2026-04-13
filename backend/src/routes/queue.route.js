@@ -13,4 +13,6 @@ router.get("/current", queueController.current);
 
 router.post("/add", queueController.add);
 
+router.get("/queue-status", queueController.queueStatus);
+
 module.exports = router;
