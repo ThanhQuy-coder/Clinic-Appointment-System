@@ -3,12 +3,14 @@ const router = express.Router();
 const QueueController = require("../controllers/queue.controller.js");
 const { authenticate } = require('../middlewares/auth.middleware.js');
 const { authorize } = require('../middlewares/role.middleware.js');
+const queueController = require("../controllers/queue.controller.js");
 
-// api: /queue/next
-router.post("/next", authenticate, authorize("Doctor"), QueueController.next);
+router.get("/next", queueController.next);
 
-// ! api: /queue-status
-// Cần thêm authenticate
-router.get("/queue-status", QueueController.getQueueStatus);
+router.post("/complete", queueController.complete);
+
+router.get("/current", queueController.current);
+
+router.post("/add", queueController.add);
 
 module.exports = router;

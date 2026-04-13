@@ -1,54 +1,57 @@
 const queueManager = require("../queues/queueManager");
 
 class QueueController {
-  // Chuyển sang cuộc hẹn tiếp theo
   async next(req, res) {
-    const { doctorId } = req.body;
-
-    await queueManager.addJob("NEXT_PATIENT", { doctorId });
-
-    return res.json({ message: "Next triggered" });
-  }
-
-  // Lấy trạng thái Queue hiện tại
-  async getQueueStatus(req, res) {
     try {
-      const { doctorId, userId } = req.query;
+      const job = await queueManager.getNext();
 
-      const appointmentQueue = queueManager.queue; 
-
-      const jobs = await appointmentQueue.getJobs(['active', 'waiting']);
-
-      const doctorQueue = jobs
-        .map(j => ({
-          ...j.data,
-          id: j.id,
-          status: j.processedOn && !j.finishedOn ? 'InProgress' : 'Confirmed'
-        }))
-        .filter(q => q.doctorId === doctorId);
-
-      const currentPatient = doctorQueue.find(q => q.status === 'InProgress');
-
-      const currentNumber = currentPatient 
-        ? doctorQueue.indexOf(currentPatient) + 1 
-        : (doctorQueue.length > 0 ? 1 : 0);
-
-      const userIndex = doctorQueue.findIndex(q => q.patientId === userId);
-      const yourNumber = userIndex !== -1 ? userIndex + 1 : 0;
-
-      const peopleAhead = (yourNumber > currentNumber) ? (yourNumber - currentNumber) : 0;
+      if (!job) {
+        return res.json({ message: "Hàng đợi trống" });
+      }
 
       return res.json({
-        currentNumber,
-        yourNumber,
-        estimatedTime: peopleAhead * 15,
-        totalInQueue: doctorQueue.length
+        message: "Đang khám bệnh nhân",
+        data: job,
       });
-
-    } catch (error) {
-      console.error("Queue Status Error:", error);
-      res.status(500).json({ message: "Lỗi hệ thống hàng đợi" });
+    } catch (err) {
+      return res.status(400).json({ message: err.message });
     }
+  }
+
+  async complete(req, res) {
+    try {
+      const job = await queueManager.complete();
+
+      return res.json({
+        message: "Đã hoàn tất khám",
+        data: job,
+      });
+    } catch (err) {
+      return res.status(400).json({ message: err.message });
+    }
+  }
+
+  async current(req, res) {
+    try {
+      const job = await queueManager.getCurrent();
+
+      return res.json({
+        data: job,
+      });
+    } catch (err) {
+      return res.status(400).json({ message: err.message });
+    }
+  }
+
+  async add(req, res) {
+    const { doctorId, patientId, appointmentId } = req.body;
+
+    const job = await queueManager.addJob(doctorId, patientId, appointmentId);
+
+    res.json({
+      message: "Added",
+      jobId: job.id,
+    });
   }
 }
 

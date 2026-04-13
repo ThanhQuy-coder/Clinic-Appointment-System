@@ -8,17 +8,18 @@ async function replayAppointments() {
     // Lấy các appointment cần đưa vào queue
     const appointments = await Appointment.findAll({
       where: {
-        Status: ['Confirmed', 'InProgress'],
+        Status: ['Confirmed'],
       },
     });
 
-    console.log(`Found ${appointments.length} appointments`);
+    console.log(`Found ${appointments.length} confirmed appointments`);
 
     for (const appt of appointments) {
       await queueManager.addJob("NEW_APPOINTMENT", {
         doctorId: appt.DoctorId,
         patientId: appt.PatientId,
-      }, {jobId: `appointment-${appt.AppointmentId}`}
+        appointmentId: appt.AppointmentId
+      }
     );
     }
 
@@ -28,4 +29,6 @@ async function replayAppointments() {
   }
 }
 
-module.exports = { replayAppointments };
+replayAppointments();
+
+// module.exports = { replayAppointments };
