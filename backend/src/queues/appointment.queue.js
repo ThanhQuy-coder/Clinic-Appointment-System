@@ -6,8 +6,13 @@
 const { Queue } = require("bullmq");
 const connection = require("../config/redis");
 
-const appointmentQueue = new Queue("appointment_queue", {
-  connection,
-});
+// Hàm tạo hoặc lấy Queue theo Doctor ID
+const getQueueByDoctor = (doctorId) => {
+  if (!doctorId) throw new Error("Cần doctorId để khởi tạo Queue");
 
-module.exports = appointmentQueue;
+  return new Queue(`appointment_queue_${doctorId}`, {
+    connection,
+  });
+};
+
+module.exports = getQueueByDoctor;

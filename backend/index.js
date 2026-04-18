@@ -11,7 +11,7 @@ const {
 } = require("./src/middlewares/error.middleware.js");
 const http = require("http");
 const socketServer = require("./src/sockets/socketServer.js");
-const { replayAppointments } = require("./src/scripts/replayAppointmentsToQueue.js");
+// const { replayAppointments } = require("./src/scripts/replayAppointmentsToQueue.js");
 
 const app = express();
 const PORT = process.env.PORT || 3000;

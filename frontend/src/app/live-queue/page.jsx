@@ -16,16 +16,16 @@ export default function LiveQueuePage() {
   });
 
   // ! test
-  const userId = "106bb68e-edb6-45f6-a4a1-afa51efdc653";
+  const userId = "23045159-a02a-4520-b5e4-80ccde72cfb7";
   const doctorId = "d98f253c-5465-4acc-9ee2-5471269c85fe";
-  const appointmentId = 7;
+  const appointmentId = 3;
 
   useEffect(() => {
     if (!appointmentId) return;
     const fetchInitialStatus = async () => {
       try {
         const response = await api.get(`/queue/queue-status`, {
-          params: { appointmentId },
+          params: { doctorId, appointmentId },
         });
 
         // Cập nhật state với dữ liệu thực từ Redis
@@ -51,7 +51,7 @@ export default function LiveQueuePage() {
       socket.emit("join", { userId, doctorId });
     });
 
-    socket.on("queue:update", (data) => {
+    socket.on("user:queue:update", (data) => {
       setQueueData(data);
     });
 
@@ -102,9 +102,9 @@ export default function LiveQueuePage() {
                 Số của bạn
               </p>
               <div className="text-4xl font-black text-slate-800">
-                {queueData.yourNumber === 0
+                {queueData.yourNumber === queueData.currentNumber
                   ? "Đang khám"
-                  : (queueData.yourNumber ?? "--")}
+                  : queueData.yourNumber === -1 ? "Khám xong" : (queueData.yourNumber ?? "--")}
               </div>
             </div>
           </div>

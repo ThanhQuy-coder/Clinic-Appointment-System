@@ -23,8 +23,10 @@ async function replayAppointments() {
     }
 
     console.log("Replay completed");
+    return 1;
   } catch (error) {
     console.error("Replay failed:", error);
+    return 0;
   }
 }
 

@@ -2,8 +2,10 @@ const queueManager = require("../queues/queueManager");
 
 class QueueController {
   async next(req, res) {
+    const { doctorId } = req.query;
+
     try {
-      const job = await queueManager.getNext();
+      const job = await queueManager.getNext(doctorId);
 
       if (!job) {
         return res.json({ message: "Hàng đợi trống" });
@@ -19,8 +21,13 @@ class QueueController {
   }
 
   async complete(req, res) {
+    const { doctorId } = req.query;
+    if (!doctorId) {
+      return res.status(400).json({message: "Thiếu doctorId"});
+    }
+
     try {
-      const job = await queueManager.complete();
+      const job = await queueManager.complete(doctorId);
 
       return res.json({
         message: "Đã hoàn tất khám",
@@ -55,16 +62,17 @@ class QueueController {
   }
 
   async queueStatus(req, res) {
-    const { appointmentId } = req.query;
+    const { doctorId, appointmentId } = req.query;
 
     try {
-      const job = await queueManager.getQueueStatus(appointmentId);
+      const job = await queueManager.getQueueStatus(doctorId, appointmentId);
 
       return res.json({
         currentNumber: job.currentNumber,
         yourNumber: job.yourNumber,
         numberAhead: job.numberAhead,
         waitTime: job.waitTime,
+        status: job.status,
       });
     } catch (err) {
       return res.status(400).json({ message: err.message });

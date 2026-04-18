@@ -3,91 +3,166 @@
  * Có 3 loại trạng thái: Waiting, Active, Completed
  */
 
-const worker = require("./appointment.worker");
-const { v4: uuidv4 } = require("uuid");
 const emitter = require("../utils/emitter");
-
-const queue = require("./appointment.queue");
+const getQueueByDoctor = require("./appointment.queue");
+const workerByDoctor = require("./appointment.worker");
+const { v4: uuidv4 } = require("uuid");
 const workerToken = uuidv4();
 
 class QueueManager {
-  async getNext() {
-    const activeJobs = await queue.getActive();
+  /**
+   * Xử lý chuyển đến bệnh nhân tiếp theo khi chưa có bệnh nhân khám
+   * @param {String} doctorId
+   * @returns
+   */
+  async getNext(doctorId) {
+    // Ràng buộc cơ bản
+    const queue = getQueueByDoctor(doctorId);
+    const jobs = await queue.getWaiting();
 
-    if (activeJobs.length > 0) {
-      throw new Error("Chưa hoàn thành bệnh nhân hiện tại");
-    }
-
-    const currentJob = await worker.getNextJob(workerToken);
-
-    if (!currentJob) {
+    if (!jobs || jobs.length === 0) {
       throw new Error("Hiện tại không có bệnh nhân");
     }
 
-    const counts = await queue.getJobCounts();
+    const activeJob = jobs.find((j) => j.data.status === "ACTIVE");
 
-    const currentNumber = counts.completed + 1;
+    if (activeJob) {
+      throw new Error("Chưa hoàn thành bệnh nhân hiện tại");
+    }
 
-    // Emit cho doctor
-    emitter.emitToDoctor(currentJob.data.doctorId, {
-      currentNumber,
-      yourNumber: 0,
-      numberAhead: counts.waiting,
-      waitTime: counts.waiting * 15,
+    const nextJob = jobs.find((j) => j.data.status === "WAITING");
+
+    if (!nextJob) {
+      throw new Error("Không còn bệnh nhân chờ");
+    }
+
+    // Gọi đến Queue để lấy job và chuyển status ACTIVE
+    await nextJob.updateData({
+      ...nextJob.data,
+      status: "ACTIVE",
     });
 
-    // Emit cho user đang khám
-    emitter.emitToUser(currentJob.data.patientId, {
+    const job = await workerByDoctor(doctorId).getNextJob(workerToken);
+
+    // Lấy vị trí job và số lượng job phía trước
+    const orderedJobs = jobs;
+    const currentIndex = orderedJobs.findIndex((j) => j.id === nextJob.id);
+    const jobsComplete = await queue.getCompleted();
+    const currentNumber = jobsComplete.length + currentIndex + 1;
+
+    // ===== Emit cho toàn bộ queue =====
+    orderedJobs.forEach((job, index) => {
+      const numberAhead = index - currentIndex;
+
+      // skip job đã hoàn thành
+      if (job.data.status === "COMPLETED") return;
+
+      emitter.emitToUser(job.data.patientId, {
+        currentNumber,
+        yourNumber: index + 1,
+        numberAhead: numberAhead > 0 ? numberAhead : 0,
+        waitTime: numberAhead > 0 ? numberAhead * 15 : 0,
+        status: job.data.status,
+      });
+    });
+
+    // ===== Emit cho doctor =====
+    const waitingCount = orderedJobs.filter(
+      (j) => j.data.status === "WAITING",
+    ).length;
+
+    emitter.emitToDoctor(nextJob.data.doctorId, {
       currentNumber,
-      yourNumber: 0,
+      yourNumber: currentNumber,
+      numberAhead: waitingCount,
+      waitTime: waitingCount * 15,
+    });
+
+    // ===== Emit cho patient đang khám =====
+    emitter.emitToUser(nextJob.data.patientId, {
+      currentNumber,
+      yourNumber: currentNumber,
       numberAhead: 0,
       waitTime: 0,
+      status: "ACTIVE",
     });
 
     return {
-      id: currentJob.id,
-      doctorId: currentJob.data.doctorId,
-      patientId: currentJob.data.patientId,
-      appointmentId: currentJob.data.appointmentId,
+      id: nextJob.id,
+      doctorId: nextJob.data.doctorId,
+      patientId: nextJob.data.patientId,
+      appointmentId: nextJob.data.appointmentId,
       status: "ACTIVE",
     };
   }
 
-  async complete() {
-    const activeJobs = await queue.getActive();
+  /**
+   * Xử lý hoàn thành khám cho bệnh nhân
+   * @param {String} doctorId
+   * @returns
+   */
+  async complete(doctorId) {
+    const queue = getQueueByDoctor(doctorId);
+    const jobs = await queue.getActive();
 
-    if (!activeJobs || activeJobs.length === 0) {
+    // Lấy job active và chuyển sang complete
+    const currentJob = jobs.find((j) => j.data.status === "ACTIVE");
+
+    if (!currentJob) {
       throw new Error("Không có bệnh nhân đang khám");
     }
 
-    const currentJob = activeJobs[0];
-
-    await currentJob.moveToCompleted("DONE", workerToken);
-
-    const waitingJobs = await queue.getWaiting();
-    const counts = await queue.getJobCounts();
-
-    const currentNumber = counts.completed; // vừa complete xong
-
-    // Emit cho doctor
-    emitter.emitToDoctor(currentJob.data.doctorId, {
-      currentNumber,
-      yourNumber: null,
-      numberAhead: waitingJobs.length,
-      waitTime: waitingJobs.length * 15,
+    await currentJob.updateData({
+      ...currentJob.data,
+      status: "COMPLETED",
     });
 
-    // Emit cho từng user trong queue
-    for (let i = 0; i < waitingJobs.length; i++) {
-      const job = waitingJobs[i];
+    const job = jobs[0];
+    if (!job) {
+      throw new Error("Không có job");
+    }
+    await job.moveToCompleted("DONE", workerToken, false);
+
+    const orderedJobs = jobs;
+    const currentIndex = orderedJobs.findIndex((j) => j.id === currentJob.id);
+    const jobsComplete = await queue.getCompleted();
+    const currentNumber = jobsComplete.length + currentIndex + 1;
+
+    // ===== Emit cho các bệnh nhân còn lại =====
+    orderedJobs.forEach((job, index) => {
+      if (job.data.status === "COMPLETED") return;
+
+      const numberAhead = index - currentIndex - 1;
 
       emitter.emitToUser(job.data.patientId, {
         currentNumber,
-        yourNumber: i + 1,
-        numberAhead: i,
-        waitTime: i * 15,
+        yourNumber: index + 1,
+        numberAhead: numberAhead > 0 ? numberAhead : 0,
+        waitTime: numberAhead > 0 ? numberAhead * 15 : 0,
+        status: job.data.status,
       });
-    }
+    });
+
+    // ===== Emit cho doctor =====
+    const waitingCount = orderedJobs.filter(
+      (j) => j.data.status === "WAITING",
+    ).length;
+
+    emitter.emitToDoctor(currentJob.data.doctorId, {
+      currentNumber,
+      yourNumber: 0,
+      numberAhead: waitingCount,
+      waitTime: waitingCount * 15,
+    });
+
+    // ===== Emit cho bệnh nhân vừa khám xong =====
+    emitter.emitToUser(currentJob.data.patientId, {
+      currentNumber,
+      yourNumber: -1,
+      numberAhead: 0,
+      waitTime: 0,
+      status: "COMPLETED",
+    });
 
     return {
       id: currentJob.id,
@@ -98,15 +173,20 @@ class QueueManager {
     };
   }
 
-  async getCurrent() {
+  /**
+   * Xử lý yêu cầu xem bệnh nhân hiện tại
+   * @param {String} doctorId
+   * @returns
+   */
+  async getCurrent(doctorId) {
+    const queue = getQueueByDoctor(doctorId);
+
     const activeJobs = await queue.getActive();
 
     if (activeJobs.length === 0)
       throw new Error("Không có bệnh nhân đang khám");
 
     const job = activeJobs[0];
-
-    // console.log(job.id);
 
     return {
       id: job.id,
@@ -116,12 +196,24 @@ class QueueManager {
     };
   }
 
+  /**
+   * Xử lý việc thêm lịch khám mới vào queue
+   * @param {String} doctorId
+   * @param {String} patientId
+   * @param {Int} appointmentId
+   * @returns
+   */
   async addJob({ doctorId, patientId, appointmentId }) {
-    if (!appointmentId) {
-      throw new Error("appointmentId is required");
+    if (!doctorId || !patientId || !appointmentId) {
+      console.log(`doctorId ${doctorId}`);
+      console.log(`patientId ${patientId}`);
+      console.log(`appointmentId ${appointmentId}`);
+
+      throw new Error("Missing required fields");
     }
 
     const jobId = `appointment_${appointmentId}`;
+    const queue = getQueueByDoctor(doctorId);
 
     return queue.add(
       "new_appointment",
@@ -129,44 +221,79 @@ class QueueManager {
         doctorId,
         patientId,
         appointmentId,
+        status: "WAITING",
       },
-      { jobId },
+      { jobId, removeOnComplete: { age: 3600 } },
     );
   }
 
-  async getQueueStatus(appointmentId) {
-    const job = await queue.getJob(`appointment_${appointmentId}`);
+  /**
+   * Xử lý yêu cầu xem hàng đợi của bệnh nhân
+   * @param {String} doctorId
+   * @param {Int} appointmentId
+   * @returns
+   */
+  async getQueueStatus(doctorId, appointmentId) {
+    const queue = getQueueByDoctor(doctorId);
+    const jobId = `appointment_${appointmentId}`;
+
+    const job = await queue.getJob(jobId);
 
     if (!job) {
-      throw new Error(`Không tìm thấy Job với ID: ${appointmentId}`);
+      console.log(`Không tìm thấy Job với ID: ${appointmentId}`);
+      throw new Error();
     }
 
-    const state = await job.getState();
+    const data = job.data;
+    const jobsWaiting = await queue.getWaiting();
+    const jobsActive = await queue.getActive();
+    const jobsComplete = await queue.getCompleted();
 
-    let position = null;
-    let jobsAhead = 0;
+    const index = jobsWaiting.findIndex((j) => j.id === job.id);
+    const currentNumber = jobsComplete.length + (jobsActive.length > 0 ? 1 : 0);
 
-    if (state === "waiting" || state === "prioritized") {
-      // Lấy danh sách ID đang chờ xử lý
-      const waitingJobs = await queue.getWaiting();
-
-      const index = waitingJobs.findIndex(
-        (job) => job.id === `appointment_${appointmentId}`,
-      );
-
-      if (index !== -1) {
-        position = index + 1;
-        jobsAhead = index;
-      }
+    // Case Completed
+    if (data.status === "COMPLETED") {
+      return {
+        currentNumber,
+        yourNumber: -1,
+        numberAhead: 0,
+        waitTime: 0,
+        status: "COMPLETED",
+      };
     }
 
-    const counts = await queue.getJobCounts();
+    // Case Active
+    if (data.status === "ACTIVE") {
+      return {
+        currentNumber,
+        yourNumber: currentNumber,
+        numberAhead: 0,
+        waitTime: 0,
+        status: "ACTIVE",
+      };
+    }
 
+    // Case Waiting
+    if (data.status === "WAITING") {
+      const numberAhead = index + 1;
+
+      return {
+        currentNumber,
+        yourNumber: currentNumber + index + 1,
+        numberAhead,
+        waitTime: numberAhead * 15,
+        status: "WAITING",
+      };
+    }
+
+    // fallback
     return {
-      currentNumber: counts.active === 0 ? "Chưa khám" : counts.active,
-      yourNumber: position !== null ? position + counts.active : null,
-      numberAhead: position !== null ? jobsAhead : null,
-      waitTime: position !== null ? (position - 1) * 15 : 0,
+      currentNumber: 0,
+      yourNumber: 0,
+      numberAhead: 0,
+      waitTime: 0,
+      status: "UNKNOWN",
     };
   }
 }

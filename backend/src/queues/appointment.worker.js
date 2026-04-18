@@ -5,17 +5,12 @@
 const { Worker } = require("bullmq");
 const connection = require("../config/redis");
 
-const worker = new Worker(
-  "appointment_queue",
-  async (job) => {
-    // Chỉ chạy khi job completed (optional)
-    return { message: "Khám bệnh hoàn tất" };
-  },
-  {
+const workerByDoctor = (doctorId) => {
+  return new Worker(`appointment_queue_${doctorId}`, async () => {}, {
     connection,
     autorun: false,
-    lockDuration: 1000 * 60 * 60, // 1 tiếng
-  },
-);
+    lockDuration: 1000 * 60 * 60,
+  });
+};
 
-module.exports = worker;
+module.exports = workerByDoctor;
