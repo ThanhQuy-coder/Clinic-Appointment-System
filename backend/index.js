@@ -14,7 +14,7 @@ const socketServer = require("./src/sockets/socketServer.js");
 const { replayAppointments } = require("./src/scripts/replayAppointmentsToQueue.js");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 // Middleware cơ bản
 app.use(express.json());
@@ -48,12 +48,14 @@ sequelize
   });
 
 // Kiểm tra kết nối IORedis
-redis.on("connect", () => {
-  console.log("Redis connected");
-});
-redis.on("error", (err) => {
-  console.error("Redis error:", err);
-});
+if (redis) {
+  redis.on("connect", () => {
+    console.log("Redis connected");
+  });
+  redis.on("error", (err) => {
+    console.error("Redis error:", err);
+  });
+}
 
 // ! Sử dụng để test
 if (process.env.REPLAY_APPOINTMENTS === 'true') {

@@ -1,4 +1,5 @@
 const { User } = require('../models/index.js');
+const { Patient } = require('../models/index.js');
 const { hashPassword, comparePassword } = require('../utils/password.js');
 const { generateToken } = require('../services/jwt.service.js');
 const {
@@ -41,6 +42,17 @@ const register = async (req, res) => {
         Role,
     });
     
+    // Auto-create patient record if role is Patient
+    let patientId = null;
+    if (Role === 'Patient') {
+        const patient = await Patient.create({
+            PatientId: user.Id,
+            ReliabilityScore: 100,
+            NoShowCount: 0,
+        });
+        patientId = patient.PatientId;
+    }
+    
     // Generate token
     const token = generateToken(user);
     
@@ -51,6 +63,7 @@ const register = async (req, res) => {
         Phone: user.Phone,
         Email: user.Email,
         Role: user.Role,
+        PatientId: patientId,
         CreatedAt: user.CreatedAt,
     };
     
@@ -70,9 +83,6 @@ const login = async (req, res) => {
     if (!user) {
         return unauthorizedResponse(res, 'Invalid email or password');
     }
-    console.log(user.PasswordHash);
-    
-    console.log(Password);
     
     // Verify password
     const isPasswordValid = await comparePassword(Password, user.PasswordHash);
@@ -84,6 +94,20 @@ const login = async (req, res) => {
     // Generate token
     const token = generateToken(user);
     
+    // Get patientId if user is a patient
+    let patientId = user.Id;
+    if (user.Role === 'Patient') {
+        const patient = await Patient.findOne({ where: { PatientId: user.Id } });
+        if (!patient) {
+            patient = await Patient.create({
+                PatientId: user.Id,
+                ReliabilityScore: 100,
+                NoShowCount: 0,
+            });
+        }
+        patientId = patient.PatientId;
+    }
+    
     // Return user data without password
     const userData = {
         Id: user.Id,
@@ -91,6 +115,7 @@ const login = async (req, res) => {
         Phone: user.Phone,
         Email: user.Email,
         Role: user.Role,
+        PatientId: patientId,
         CreatedAt: user.CreatedAt,
     };
     

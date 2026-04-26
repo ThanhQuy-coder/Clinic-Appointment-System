@@ -42,11 +42,11 @@ export default function Register() {
             // Save local storage
             localStorage.setItem('accessToken', token);
             
-            toast.success(`Chào mừng ${user?.name}!`, { id: loadingToast });
+            toast.success(`Đăng ký thành công! Vui lòng đăng nhập.`, { id: loadingToast });
 
             setTimeout(() => {
-                router.push('/');
-            }, 1000);
+                router.push('/login');
+            }, 1500);
 
         } catch (error) {
             const message = error.response?.data?.message || 'Đăng ký thất bại. Thử lại sau!';

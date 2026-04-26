@@ -33,11 +33,17 @@ export default function Login() {
             
             // Save local storage 
             localStorage.setItem('accessToken', token);
+            localStorage.setItem('user', JSON.stringify(user));
             
-            toast.success(`Chào mừng ${user?.name || 'trở lại'}!`, { id: loadingToast });
+            toast.success(`Chào mừng ${user?.name || user?.FullName || 'trở lại'}!`, { id: loadingToast });
 
+            // Chuyển hướng dựa trên role
             setTimeout(() => {
-                router.push('/');
+                if (user.Role === 'Patient') {
+                    router.push('/dashboard');
+                } else {
+                    router.push('/admin/dashboard');
+                }
             }, 1000);
 
         } catch (error) {

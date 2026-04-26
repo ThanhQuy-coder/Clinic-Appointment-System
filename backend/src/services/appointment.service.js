@@ -1,4 +1,5 @@
-const { Appointment, Doctor, WorkSchedule, DoctorLeave, Patient, sequelize } = require('../models/index.js');
+const db = require('../models/index.js');
+const { Appointment, Doctor, WorkSchedule, DoctorLeave, Patient, sequelize } = db;
 const { Op, Transaction } = require('sequelize');
 
 const SLOT_OCCUPYING_STATUSES = ['Pending', 'Confirmed', 'InProgress'];
@@ -123,16 +124,16 @@ const createAppointment = async (data) => {
 };
 
 const getAppointments = async (filters) => {
-    const { PatientId, DoctorId, Date, Status, Page = 1, Limit = 20 } = filters;
+    const { PatientId, DoctorId, Date: filterDate, Status, Page = 1, Limit = 20 } = filters;
     const where = {};
 
     if (PatientId) where.PatientId = PatientId;
     if (DoctorId) where.DoctorId = DoctorId;
     if (Status) where.Status = Status;
-    if (Date) {
-        const dayStart = new Date(Date);
+    if (filterDate) {
+        const dayStart = new Date(filterDate);
         dayStart.setHours(0, 0, 0, 0);
-        const dayEnd = new Date(Date);
+        const dayEnd = new Date(filterDate);
         dayEnd.setHours(23, 59, 59, 999);
         where.StartTime = { [Op.between]: [dayStart, dayEnd] };
     }
@@ -140,7 +141,18 @@ const getAppointments = async (filters) => {
     const { count, rows } = await Appointment.findAndCountAll({
         where,
         include: [
-            { model: Doctor, as: 'doctor', attributes: ['DoctorId', 'Specialty'] },
+            {
+                model: Doctor,
+                as: 'doctor',
+                attributes: ['DoctorId', 'Specialty'],
+                include: [{ model: db.User, as: 'user', attributes: ['Id', 'FullName'] }],
+            },
+            {
+                model: Patient,
+                as: 'patient',
+                attributes: ['PatientId'],
+                include: [{ model: db.User, as: 'user', attributes: ['Id', 'FullName', 'Phone'] }],
+            },
         ],
         order: [['StartTime', 'ASC']],
         limit: parseInt(Limit),

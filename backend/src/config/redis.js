@@ -6,9 +6,27 @@
 const { Redis } = require("ioredis");
 require("dotenv").config({ path: __dirname + "/../../.env" });
 
-const connection = new Redis({
-  host: process.env.IOREDIS_HOST,
-  port: process.env.IOREDIS_PORT,
-});
+const redisConfig = {
+  host: process.env.IOREDIS_HOST || "127.0.0.1",
+  port: process.env.IOREDIS_PORT || 6379,
+  maxRetriesPerRequest: 1,
+  enableReadyCheck: false,
+  retryStrategy: () => null,
+  connectTimeout: 3000,
+  lazyConnect: true,
+  showFriendlyErrorStack: false,
+};
+
+let connection = null;
+
+try {
+  const RedisClient = new Redis(redisConfig);
+  RedisClient.on("error", () => {});
+  RedisClient.on("close", () => {});
+  RedisClient.on("end", () => {});
+  connection = RedisClient;
+} catch (error) {
+  connection = null;
+}
 
 module.exports = connection;
