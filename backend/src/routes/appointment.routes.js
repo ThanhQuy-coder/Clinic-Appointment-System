@@ -33,12 +33,6 @@ router.post('/', async (req, res) => {
             IsEmergency,
         });
 
-        // event-driven thêm vào queue
-        await queueManager.addJob("NEW_APPOINTMENT", {
-            doctorId: DoctorId,
-            patientId: PatientId,
-        });
-
         return createdResponse(res, appointment, 'Tạo lịch hẹn thành công');
     } catch (error) {
         if (error.statusCode === 409) {
@@ -80,12 +74,6 @@ router.patch('/:id/cancel', async (req, res) => {
         const { reason } = req.body;
         const appointment = await appointmentService.cancelAppointment(req.params.id, reason);
 
-        // event-driven thêm vào queue
-        await queueManager.addJob("CANCEL_APPOINTMENT", {
-              doctorId: appointment.doctorId,
-              patientId: appointment.patientId,
-        });
-
         return successResponse(res, appointment, 'Hủy lịch hẹn thành công');
     } catch (error) {
         if (error.statusCode === 404) {
@@ -109,14 +97,6 @@ router.patch('/:id/status', async (req, res) => {
         const appointment = await appointmentService.updateAppointmentStatus(
             req.params.id, status, actualStartTime, actualEndTime
         );
-
-        // event-driven thêm vào queue
-        if (["Completed", "NoShow", "Cancelled"].includes(appointment.status)) {
-            await queueManager.addJob("CANCEL_APPOINTMENT", {
-              doctorId: appointment.doctorId,
-              patientId: appointment.patientId,
-            });
-        }
         
         return successResponse(res, appointment, 'Cập nhật trạng thái thành công');
     } catch (error) {

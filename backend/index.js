@@ -11,7 +11,7 @@ const {
 } = require("./src/middlewares/error.middleware.js");
 const http = require("http");
 const socketServer = require("./src/sockets/socketServer.js");
-const { replayAppointments } = require("./src/scripts/replayAppointmentsToQueue.js");
+// const { replayAppointments } = require("./src/scripts/replayAppointmentsToQueue.js");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -55,13 +55,6 @@ if (redis) {
   redis.on("error", (err) => {
     console.error("Redis error:", err);
   });
-}
-
-// ! Sử dụng để test
-if (process.env.REPLAY_APPOINTMENTS === 'true') {
-  replayAppointments()
-    .then(() => console.log("Replay appointments finished"))
-    .catch(err => console.error("Replay error:", err));
 }
 
 server.listen(PORT, () => {

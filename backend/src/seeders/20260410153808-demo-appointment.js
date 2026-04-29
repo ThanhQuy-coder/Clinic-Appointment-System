@@ -18,7 +18,7 @@ module.exports = {
         StartTime: makeDate(8, 0),
         EndTime: makeDate(8, 30),
         AppointmentType: 'General Checkup',
-        Status: 'Completed',
+        Status: 'Confirmed',
         ActualStartTime: makeDate(8, 5),
         ActualEndTime: makeDate(8, 35),
         IsEmergency: false,
@@ -82,7 +82,7 @@ module.exports = {
         StartTime: makeDate(13, 30),
         EndTime: makeDate(14, 0),
         AppointmentType: 'Follow-up',
-        Status: 'Pending',
+        Status: 'Confirmed',
         IsEmergency: false,
       },
     ], {});
