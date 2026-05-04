@@ -87,7 +87,6 @@ router.patch('/:id/cancel', async (req, res) => {
 });
 
 // API: Patch api/appointments/:id/status
-// ! Nếu bệnh nhân đã hủy lịch cancel
 router.patch('/:id/status', async (req, res) => {
     try {
         const { status, actualStartTime, actualEndTime } = req.body;

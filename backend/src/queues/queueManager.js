@@ -18,19 +18,19 @@ class QueueManager {
   async getNext(doctorId) {
     // Ràng buộc cơ bản
     const queue = getQueueByDoctor(doctorId);
-    const jobs = await queue.getWaiting();
+    const waitingJobs = await queue.getWaiting();
 
-    if (!jobs || jobs.length === 0) {
+    if (!waitingJobs || waitingJobs.length === 0) {
       throw new Error("Hiện tại không có bệnh nhân");
     }
 
-    const activeJob = jobs.find((j) => j.data.status === "ACTIVE");
+    const activeJob = waitingJobs.find((j) => j.data.status === "ACTIVE");
 
     if (activeJob) {
       throw new Error("Chưa hoàn thành bệnh nhân hiện tại");
     }
 
-    const nextJob = jobs.find((j) => j.data.status === "WAITING");
+    const nextJob = waitingJobs.find((j) => j.data.status === "WAITING");
 
     if (!nextJob) {
       throw new Error("Không còn bệnh nhân chờ");
@@ -45,7 +45,7 @@ class QueueManager {
     const job = await workerByDoctor(doctorId).getNextJob(workerToken);
 
     // Lấy vị trí job và số lượng job phía trước
-    const orderedJobs = jobs;
+    const orderedJobs = waitingJobs;
     const currentIndex = orderedJobs.findIndex((j) => j.id === nextJob.id);
     const jobsComplete = await queue.getCompleted();
     const currentNumber = jobsComplete.length + currentIndex + 1;
@@ -103,10 +103,10 @@ class QueueManager {
    */
   async complete(doctorId) {
     const queue = getQueueByDoctor(doctorId);
-    const jobs = await queue.getActive();
+    const activeJobs = await queue.getActive();
 
     // Lấy job active và chuyển sang complete
-    const currentJob = jobs.find((j) => j.data.status === "ACTIVE");
+    const currentJob = activeJobs.find((j) => j.data.status === "ACTIVE");
 
     if (!currentJob) {
       throw new Error("Không có bệnh nhân đang khám");
@@ -114,16 +114,16 @@ class QueueManager {
 
     await currentJob.updateData({
       ...currentJob.data,
-      status: "COMPLETED",
+      status: "COMPLETED", 
     });
 
-    const job = jobs[0];
+    const job = activeJobs[0];
     if (!job) {
       throw new Error("Không có job");
     }
     await job.moveToCompleted("DONE", workerToken, false);
 
-    const orderedJobs = jobs;
+    const orderedJobs = activeJobs;
     const currentIndex = orderedJobs.findIndex((j) => j.id === currentJob.id);
     const jobsComplete = await queue.getCompleted();
     const currentNumber = jobsComplete.length + currentIndex + 1;
@@ -295,6 +295,42 @@ class QueueManager {
       waitTime: 0,
       status: "UNKNOWN",
     };
+  }
+
+  /**
+   * Xử lý việc cancel
+   * @param {String} doctorId 
+   */
+  async cancel(appointmentId, doctorId) {
+    const queue = getQueueByDoctor(doctorId);
+    const jobId = `appointment_${appointmentId}`;
+
+    try {
+      const job = await queue.getJob(jobId);
+
+      if (!job) {
+        console.warn(`Không tìm thấy Job với ID: ${appointmentId}`);
+        throw new Error('Job not found');
+      }
+
+      const state = await job.getState();
+
+      if (state === 'waiting') {
+        await job.remove();
+        console.log(`Đã remove job ${jobId}`);
+      } else {
+        console.warn(`Job ${jobId} không ở trạng thái waiting, state hiện tại: ${state}`);
+      }
+
+    } catch (error) {
+      console.error('Lỗi khi cancel job', {
+        appointmentId,
+        doctorId,
+        error: error.message,
+      });
+
+      throw error;
+    }
   }
 }
 

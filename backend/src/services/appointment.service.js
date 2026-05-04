@@ -1,4 +1,5 @@
 const db = require('../models/index.js');
+const queueManager = require('../queues/queueManager.js');
 const { Appointment, Doctor, WorkSchedule, DoctorLeave, Patient, sequelize } = db;
 const { Op, Transaction } = require('sequelize');
 
@@ -185,10 +186,22 @@ const cancelAppointment = async (appointmentId, reason) => {
             throw error;
         }
 
-        if (['Cancelled', 'NoShow', 'Completed'].includes(appointment.Status)) {
+        if (['Cancelled', 'InProgress', 'NoShow', 'Completed'].includes(appointment.Status)) {
             const error = new Error('Không thể hủy appointment đã ở trạng thái: ' + appointment.Status);
             error.statusCode = 400;
             throw error;
+        }
+
+        try {
+            await queueManager.cancel(appointmentId, appointment.DoctorId);
+        } catch(err) {
+            console.error('Failed to work with in queue', {
+                doctorId: appointment.DoctorId,
+                appointmentId,
+                error
+            });
+            
+            throw err;
         }
 
         await appointment.update({
@@ -217,6 +230,33 @@ const updateAppointmentStatus = async (appointmentId, status, actualStartTime = 
             throw error;
         }
 
+        // Xử lý queue
+        try{
+            // Thêm bệnh nhân vào hàng đợi (trạng thái job trong queue WAITING)
+            if (status === "Confirmed") {
+                await queueManager.addJob(appointment.DoctorId, appointment.PatientId, appointmentId);
+            }
+
+            // Hoàn thành bệnh nhân vào hàng đợi (trạng thái job trong queue ACTIVE --> COMPLETED)
+            if (status === "Completed") {
+                await queueManager.complete(appointment.DoctorId);
+            }
+
+            if (status === "Cancelled") {
+                cancelAppointment(appointmentId, `Bác sĩ đã hủy cuộc hẹn số:${appointmentId}`)
+            }
+
+        } catch(error){
+            console.error('Failed to work with in queue', {
+                doctorId: appointment.DoctorId,
+                patientId: appointment.PatientId,
+                appointmentId,
+                error
+            });
+
+            throw error;
+        }
+
         const updateData = { Status: status };
         if (actualStartTime) updateData.ActualStartTime = new Date(actualStartTime);
         if (actualEndTime) updateData.ActualEndTime = new Date(actualEndTime);
@@ -232,6 +272,18 @@ const confirmArrival = async (appointmentId) => {
         if (!appointment) {
             const error = new Error('Appointment not found');
             error.statusCode = 404;
+            throw error;
+        }
+
+        // Gọi bệnh nhân trong hàng đợi (trạng thái job trong queue từ WAITING --> ACTIVE)
+        try {
+            await queueManager.getNext(appointment.doctorId);
+        } catch (error) {
+            console.error('Failed to next job to queue', {
+                doctorId: appointment.DoctorId,
+                error
+            });
+
             throw error;
         }
 
