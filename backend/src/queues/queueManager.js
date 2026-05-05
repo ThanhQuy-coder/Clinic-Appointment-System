@@ -101,7 +101,7 @@ class QueueManager {
    * @param {String} doctorId
    * @returns
    */
-  async complete(doctorId) {
+  async complete(doctorId, status) {
     const queue = getQueueByDoctor(doctorId);
     const activeJobs = await queue.getActive();
 
@@ -114,7 +114,7 @@ class QueueManager {
 
     await currentJob.updateData({
       ...currentJob.data,
-      status: "COMPLETED", 
+      status, 
     });
 
     const job = activeJobs[0];
@@ -161,7 +161,7 @@ class QueueManager {
       yourNumber: -1,
       numberAhead: 0,
       waitTime: 0,
-      status: "COMPLETED",
+      status,
     });
 
     return {
@@ -169,7 +169,7 @@ class QueueManager {
       doctorId: currentJob.data.doctorId,
       patientId: currentJob.data.patientId,
       appointmentId: currentJob.data.appointmentId,
-      status: "COMPLETED",
+      status,
     };
   }
 

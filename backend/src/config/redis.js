@@ -9,7 +9,7 @@ require("dotenv").config({ path: __dirname + "/../../.env" });
 const redisConfig = {
   host: process.env.IOREDIS_HOST || "127.0.0.1",
   port: process.env.IOREDIS_PORT || 6379,
-  maxRetriesPerRequest: 1,
+  maxRetriesPerRequest: null,
   enableReadyCheck: false,
   retryStrategy: () => null,
   connectTimeout: 3000,

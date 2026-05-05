@@ -1,5 +1,7 @@
 # 1. Hướng dẫn chạy dự án
 
+> Cập nhật: 05/05/2026
+
 ### Bước 1: Cài đặt cần thiết
 
 > Yêu cầu đã cài đặt MySQL và Nodejs
@@ -62,7 +64,30 @@ npx sequelize-cli db:migrate
 
 > Từ khóa công nghệ này là `Sequelize`, Tổng hợp lệnh có thể tham khảo ở bên dưới
 
-### Bước 5: Chạy dự án (Hoàn thành)
+### Bước 5: Chạy Redis bằng docker để sử dụng chức năng Queue-realtime
+
+1. Đã cài đặt docker
+2. Khởi chạy docker và chạy lệnh sau:
+
+```bash
+# Đây là lệnh tạo container redis
+docker run -d --name redis -p 6379:6379 redis
+```
+
+3. Cấu hình tiếp tục file `.env` trong `backend` như sau:
+
+```bash
+# Thêm 2 biến sau vào cuối file
+# ioredis (Có thể copy luôn vì không phải key quan trọng)
+IOREDIS_HOST=127.0.0.1
+IOREDIS_PORT=6379
+```
+
+> Như vậy thì đã chạy được, khi chạy dự án lại thì chỉ cần mở docker và chạy container redis là xong 
+> ---
+> Nếu muốn tìm hiểu sâu chức năng này từ khóa là `bullMQ + Redis`
+
+### Bước 6: Chạy dự án (Hoàn thành)
 
 ```bash
 # Chạy backend (Đây là chạy dev mode nếu chạy bình thường thì đổi `dev` thành `start`)

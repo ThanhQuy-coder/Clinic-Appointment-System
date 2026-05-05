@@ -234,16 +234,21 @@ const updateAppointmentStatus = async (appointmentId, status, actualStartTime = 
         try{
             // Thêm bệnh nhân vào hàng đợi (trạng thái job trong queue WAITING)
             if (status === "Confirmed") {
-                await queueManager.addJob(appointment.DoctorId, appointment.PatientId, appointmentId);
+                await queueManager.addJob({doctorId: appointment.DoctorId, patientId: appointment.PatientId, appointmentId});
             }
 
-            // Hoàn thành bệnh nhân vào hàng đợi (trạng thái job trong queue ACTIVE --> COMPLETED)
+            // Hoàn thành hàng đợi (trạng thái job trong queue ACTIVE --> COMPLETED)
             if (status === "Completed") {
-                await queueManager.complete(appointment.DoctorId);
+                await queueManager.complete(appointment.DoctorId, status);
+            }
+
+            // Hoàn thành hàng đợi nhưng status của patient là NoShow (trạng thái job trong queue ACTIVE --> COMPLETED)
+            if (status === "NoShow") {
+                await queueManager.complete(appointment.DoctorId, status);
             }
 
             if (status === "Cancelled") {
-                cancelAppointment(appointmentId, `Bác sĩ đã hủy cuộc hẹn số:${appointmentId}`)
+                cancelAppointment(appointmentId, `Bác sĩ đã hủy cuộc hẹn:${appointmentId}`)
             }
 
         } catch(error){
@@ -277,7 +282,7 @@ const confirmArrival = async (appointmentId) => {
 
         // Gọi bệnh nhân trong hàng đợi (trạng thái job trong queue từ WAITING --> ACTIVE)
         try {
-            await queueManager.getNext(appointment.doctorId);
+            await queueManager.getNext(appointment.DoctorId);
         } catch (error) {
             console.error('Failed to next job to queue', {
                 doctorId: appointment.DoctorId,

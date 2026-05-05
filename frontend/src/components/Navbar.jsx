@@ -69,7 +69,8 @@ const Navbar = () => {
                     <>
                         <Link href="/appointments" className="hover:text-[#0e6add] transition-colors">Lịch hẹn</Link>
                         {user.Role === 'Patient' && (
-                            <Link href="/dashboard" className="hover:text-[#0e6add] transition-colors">Dashboard</Link>
+                            <Link href="/dashboard" className="hover:text-[#0e6add] transition-colors">Dashboard</Link>,
+                            <Link href="/live-queue" className="hover:text-[#0e6add] transition-colors">Hàng đợi</Link>
                         )}
                         {(user.Role === 'Doctor' || user.Role === 'Admin') && (
                             <Link href="/admin/dashboard" className="hover:text-[#0e6add] transition-colors">Dashboard</Link>
