@@ -2,11 +2,16 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { io } from "socket.io-client";
+
+const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_URL_SOCKET || "http://localhost:3001";
 
 const Navbar = () => {
     // Biến state để lưu trạng thái xem đã cuộn chuột hay chưa
     const [isScrolled, setIsScrolled] = useState(false);
     const [user, setUser] = useState(null);
+    const [notifications, setNotifications] = useState([]);
+    const [showNotificationPanel, setShowNotificationPanel] = useState(false);
 
     useEffect(() => {
         // Kiểm tra xem user đã đăng nhập chưa (từ localStorage)
@@ -31,6 +36,24 @@ const Navbar = () => {
         window.addEventListener('scroll', handleScroll);
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
+
+    useEffect(() => {
+        if (!user?.Id) return;
+
+        const socket = io(SOCKET_SERVER_URL);
+
+        socket.on("connect", () => {
+            socket.emit("join", { userId: user.Id });
+        });
+
+        socket.on("user:notification:new", (payload) => {
+            setNotifications((prev) => [payload, ...prev].slice(0, 10));
+        });
+
+        return () => {
+            socket.disconnect();
+        };
+    }, [user?.Id]);
 
     const handleLogout = () => {
         localStorage.removeItem('accessToken');
@@ -84,6 +107,39 @@ const Navbar = () => {
             <div className="flex items-center space-x-2">
                 {user ? (
                     <>
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowNotificationPanel((prev) => !prev)}
+                                className="relative px-3 py-2 rounded-full hover:bg-blue-50 transition-colors"
+                                aria-label="Thông báo"
+                            >
+                                <span className="text-lg">🔔</span>
+                                {notifications.length > 0 && (
+                                    <span className="absolute -top-1 -right-1 text-[10px] bg-red-500 text-white rounded-full min-w-4 h-4 px-1 flex items-center justify-center">
+                                        {notifications.length > 9 ? "9+" : notifications.length}
+                                    </span>
+                                )}
+                            </button>
+
+                            {showNotificationPanel && (
+                                <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-auto bg-white border border-gray-200 rounded-xl shadow-xl z-50">
+                                    <div className="px-4 py-3 border-b border-gray-100 font-semibold text-sm">
+                                        Thông báo thời gian thực
+                                    </div>
+                                    {notifications.length === 0 ? (
+                                        <p className="px-4 py-6 text-sm text-gray-500">Chưa có thông báo mới.</p>
+                                    ) : (
+                                        notifications.map((item, idx) => (
+                                            <div key={`${item.sendingTime || ""}-${idx}`} className="px-4 py-3 border-b border-gray-50">
+                                                <p className="text-sm font-medium text-gray-800">{item.title || "Thông báo"}</p>
+                                                <p className="text-sm text-gray-600 mt-1">{item.message}</p>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
                         <span className="px-4 py-2 text-gray-600 font-medium">
                             Xin chào, {user.FullName || user.fullName || user.name || 'User'}
                         </span>

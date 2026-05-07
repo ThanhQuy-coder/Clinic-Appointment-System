@@ -20,6 +20,12 @@ class Emitter {
     // console.log(`user-${userId}: data ${data}`);
     this.io.to(`user-${userId}`).emit("user:queue:update", data);
   }
+
+  // Emit thông báo realtime cho 1 user cụ thể
+  emitNotificationToUser(userId, data) {
+    if (!this.io) return;
+    this.io.to(`user-${userId}`).emit("user:notification:new", data);
+  }
 }
 
 module.exports = new Emitter();

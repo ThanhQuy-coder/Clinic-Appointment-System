@@ -1,5 +1,6 @@
 const db = require('../models/index.js');
 const queueManager = require('../queues/queueManager.js');
+const notificationService = require('./notification.service.js');
 const { Appointment, Doctor, WorkSchedule, DoctorLeave, Patient, sequelize } = db;
 const { Op, Transaction } = require('sequelize');
 
@@ -204,6 +205,11 @@ const cancelAppointment = async (appointmentId, reason) => {
             throw err;
         }
 
+        await notificationService.sendAppointmentCancelled({
+            userId: appointment.PatientId,
+            appointmentId: appointment.AppointmentId,
+        });
+
         await appointment.update({
             Status: 'Cancelled',
             CancelledAt: new Date(),
@@ -235,6 +241,18 @@ const updateAppointmentStatus = async (appointmentId, status, actualStartTime = 
             // Thêm bệnh nhân vào hàng đợi (trạng thái job trong queue WAITING)
             if (status === "Confirmed") {
                 await queueManager.addJob({doctorId: appointment.DoctorId, patientId: appointment.PatientId, appointmentId});
+                await notificationService.sendAppointmentCreated({
+                    userId: appointment.PatientId,
+                    appointmentId: appointment.AppointmentId,
+                    doctorId: appointment.DoctorId,
+                    startTime: appointment.StartTime,
+                });
+                await notificationService.scheduleAppointmentReminders({
+                    userId: appointment.PatientId,
+                    appointmentId: appointment.AppointmentId,
+                    doctorId: appointment.DoctorId,
+                    startTime: appointment.StartTime,
+                });
             }
 
             // Hoàn thành hàng đợi (trạng thái job trong queue ACTIVE --> COMPLETED)

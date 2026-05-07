@@ -6,6 +6,7 @@
 const emitter = require("../utils/emitter");
 const getQueueByDoctor = require("./appointment.queue");
 const workerByDoctor = require("./appointment.worker");
+const notificationService = require("../services/notification.service");
 const { v4: uuidv4 } = require("uuid");
 const workerToken = uuidv4();
 
@@ -87,6 +88,12 @@ class QueueManager {
       status: "ACTIVE",
     });
 
+    await notificationService.sendAppointmentTurn({
+      userId: nextJob.data.patientId,
+      appointmentId: nextJob.data.appointmentId,
+      doctorId: nextJob.data.doctorId,
+    });
+
     return {
       id: nextJob.id,
       doctorId: nextJob.data.doctorId,
@@ -163,6 +170,18 @@ class QueueManager {
       waitTime: 0,
       status,
     });
+
+    if (status === "NoShow") {
+      await notificationService.sendAppointmentMissed({
+        userId: currentJob.data.patientId,
+        appointmentId: currentJob.data.appointmentId,
+      });
+    } else {
+      await notificationService.sendAppointmentCompleted({
+        userId: currentJob.data.patientId,
+        appointmentId: currentJob.data.appointmentId,
+      });
+    }
 
     return {
       id: currentJob.id,

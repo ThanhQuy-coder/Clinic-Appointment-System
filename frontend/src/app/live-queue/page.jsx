@@ -6,6 +6,14 @@ import { Calendar, Clock, User, Stethoscope, Bell, Timer, Users, XCircle, Chevro
 import api from "@/lib/axios";
 
 const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_URL_SOCKET || "http://localhost:3001";
+const STATUS_LABELS = {
+  Confirmed: "Đã xác nhận",
+  Pending: "Chờ xác nhận",
+  Completed: "Đã khám xong",
+  Cancelled: "Đã hủy",
+  NoShow: "Vắng mặt",
+  InProgress: "Đang khám",
+};
 
 export default function AppointmentListPage() {
   const [data, setData] = useState([]);
@@ -43,14 +51,9 @@ export default function AppointmentListPage() {
 
       const user = JSON.parse(raw);
 
-      console.log("👤 User từ localStorage:", user);
-
       const id = user?.Id || user?.patientId;
 
-      console.log(id);
-
       if (!id) {
-        console.log("❌ User không có id hợp lệ");
         setLoading(false);
         return;
       }
@@ -74,8 +77,6 @@ export default function AppointmentListPage() {
             limit: 50,
           },
         });
-
-        console.log("📦 API response:", res.data);
 
         const appointments = res.data.data?.appointments || [];
         setData(appointments);
@@ -151,10 +152,7 @@ export default function AppointmentListPage() {
     const doctorId = appointment?.doctor?.DoctorId;
     const appointmentId = appointment?.AppointmentId;
 
-    console.log("🔍 Debug:", { doctorId, appointmentId });
-
     if (!doctorId || !appointmentId) {
-      console.log("❌ Thiếu doctorId hoặc appointmentId");
       return;
     }
 
@@ -217,6 +215,18 @@ export default function AppointmentListPage() {
   };
 
   // ================= UI =================
+  const progressPercent =
+    queueData.yourNumber > 0 && queueData.currentNumber > 0
+      ? Math.min(100, Math.round((queueData.currentNumber / queueData.yourNumber) * 100))
+      : 0;
+
+  const queueHeadline =
+    queueData.yourNumber === -1
+      ? "Bạn đã hoàn thành khám"
+      : queueData.yourNumber > 0 && queueData.currentNumber === queueData.yourNumber
+        ? "Đến lượt bạn"
+        : `Còn ${Math.max(0, queueData.numberAhead || 0)} người phía trước`;
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
@@ -246,12 +256,12 @@ export default function AppointmentListPage() {
     const specialty = selectedAppointment?.doctor?.Specialty || "Không rõ chuyên khoa";
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-4 md:p-8">
-        <div className="max-w-2xl mx-auto">
-          <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-4 md:p-8">
+        <div className="max-w-3xl mx-auto">
+          <div className="bg-white rounded-2xl shadow-lg border border-slate-100 p-5 md:p-6 mb-5">
             <button
               onClick={handleBackToList}
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors"
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors text-sm md:text-base"
             >
               <ArrowLeft className="w-5 h-5" />
               <span className="font-medium">Quay lại danh sách</span>
@@ -273,13 +283,13 @@ export default function AppointmentListPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden">
             <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-5 text-white">
-              <h2 className="text-xl font-bold flex items-center gap-2">
+              <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
                 <Users className="w-6 h-6" />
                 Hàng đợi khám bệnh
               </h2>
-              <p className="text-blue-100 text-sm mt-1">Cập nhật trực tiếp theo thời gian thực</p>
+              <p className="text-blue-100 text-sm mt-1">Cập nhật trực tiếp theo thời gian thực - {queueHeadline}</p>
             </div>
 
             {queueLoading ? (
@@ -288,22 +298,21 @@ export default function AppointmentListPage() {
                 <p className="mt-4 text-gray-500">Đang tải hàng đợi...</p>
               </div>
             ) : (
-              <div className="p-6 space-y-6">
-                <div className="flex justify-around items-center py-6">
+              <div className="p-5 md:p-6 space-y-5">
+                <div className="grid grid-cols-2 gap-3 items-stretch">
                   <div className="text-center">
                     <p className="text-gray-500 text-xs uppercase tracking-wider mb-2">
                       Đang gọi số
                     </p>
-                    <div className="text-5xl font-black text-blue-600">
+                    <div className="text-4xl md:text-5xl font-black text-blue-600">
                       {queueData.currentNumber > 0 ? queueData.currentNumber : "---"}
                     </div>
                   </div>
-                  <div className="h-16 w-[1px] bg-gray-200"></div>
                   <div className="text-center">
                     <p className="text-gray-500 text-xs uppercase tracking-wider mb-2">
                       Số của bạn
                     </p>
-                    <div className="text-5xl font-black text-gray-800">
+                    <div className="text-4xl md:text-5xl font-black text-gray-800">
                       {queueData.yourNumber === queueData.currentNumber && queueData.yourNumber > 0
                         ? "Đang khám"
                         : queueData.yourNumber === -1 
@@ -341,16 +350,12 @@ export default function AppointmentListPage() {
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm font-medium text-gray-600">
                       <span>Tiến độ hàng đợi</span>
-                      <span>
-                        {Math.min(100, Math.round((queueData.currentNumber / queueData.yourNumber) * 100))}%
-                      </span>
+                      <span>{progressPercent}%</span>
                     </div>
                     <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
                       <div
                         className="bg-gradient-to-r from-blue-500 to-indigo-600 h-full transition-all duration-500 ease-out"
-                        style={{ 
-                          width: `${Math.min(100, Math.round((queueData.currentNumber / queueData.yourNumber) * 100))}%` 
-                        }}
+                        style={{ width: `${progressPercent}%` }}
                       ></div>
                     </div>
                   </div>
@@ -394,10 +399,10 @@ export default function AppointmentListPage() {
 
   // Hiển thị danh sách lịch hẹn với bộ lọc
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-4 md:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
         {/* HEADER */}
-        <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-100 p-5 md:p-6 mb-4">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
@@ -419,7 +424,7 @@ export default function AppointmentListPage() {
         </div>
 
         {/* FILTER BAR */}
-        <div className="bg-white rounded-2xl shadow-xl p-4 mb-6">
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-100 p-4 mb-6">
           {/* Search */}
           <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -472,7 +477,7 @@ export default function AppointmentListPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Sắp xếp theo
                 </label>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   {[
                     { value: "date", label: "Ngày khám", icon: CalendarDays },
                     { value: "doctor", label: "Tên bác sĩ", icon: User },
@@ -510,7 +515,7 @@ export default function AppointmentListPage() {
 
         {/* Kết quả tìm kiếm */}
         {filteredData.length === 0 && (
-          <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
+          <div className="bg-white rounded-2xl shadow-lg border border-slate-100 p-12 text-center">
             <Search className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-700 mb-2">Không tìm thấy kết quả</h3>
             <p className="text-gray-500">Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm</p>
@@ -546,7 +551,7 @@ export default function AppointmentListPage() {
             return (
               <div
                 key={item.AppointmentId}
-                className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100"
+                className="bg-white rounded-2xl shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden border border-gray-100"
               >
                 <div className="p-6">
                   <div className="flex justify-between items-start mb-4">
@@ -568,7 +573,7 @@ export default function AppointmentListPage() {
 
                     <div className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1 border ${statusClass}`}>
                       {statusIcons[item.Status] || <Bell className="w-3 h-3" />}
-                      <span>{item.Status || "Unknown"}</span>
+                      <span>{STATUS_LABELS[item.Status] || item.Status || "Unknown"}</span>
                     </div>
                   </div>
 

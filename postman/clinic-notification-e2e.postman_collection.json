@@ -1,0 +1,333 @@
+{
+  "info": {
+    "_postman_id": "d7c4be74-0ec5-4cd4-b7a4-7d2c4e8f31b1",
+    "name": "Clinic Notification E2E",
+    "description": "E2E API flow to test appointment and realtime notification triggers.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01 - Login Patient",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"Email\": \"{{patientEmail}}\",\n  \"Password\": \"{{patientPassword}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/users/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "users",
+            "login"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Login success\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const res = pm.response.json();",
+              "const token = res?.data?.token;",
+              "const user = res?.data?.user;",
+              "",
+              "if (token) pm.collectionVariables.set(\"patientToken\", token);",
+              "if (user?.Id) pm.collectionVariables.set(\"patientId\", String(user.Id));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Create Appointment",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"PatientId\": \"{{patientId}}\",\n  \"DoctorId\": \"{{doctorId}}\",\n  \"StartTime\": \"{{appointmentStartTime}}\",\n  \"EndTime\": \"{{appointmentEndTime}}\",\n  \"AppointmentType\": \"General\",\n  \"IsEmergency\": false\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/appointments",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "appointments"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Create appointment success\", function () {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+              "});",
+              "",
+              "const res = pm.response.json();",
+              "const appt = res?.data;",
+              "if (appt?.AppointmentId) {",
+              "  pm.collectionVariables.set(\"appointmentId\", String(appt.AppointmentId));",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Confirm Appointment (status=Confirmed)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"Confirmed\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/appointments/{{appointmentId}}/status",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "appointments",
+            "{{appointmentId}}",
+            "status"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Confirm status success\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - Get Queue Status",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/queue/status?doctorId={{doctorId}}&appointmentId={{appointmentId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "queue",
+            "status"
+          ],
+          "query": [
+            {
+              "key": "doctorId",
+              "value": "{{doctorId}}"
+            },
+            {
+              "key": "appointmentId",
+              "value": "{{appointmentId}}"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Queue status success\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - Queue Next (trigger TURN)",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/queue/next?doctorId={{doctorId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "queue",
+            "next"
+          ],
+          "query": [
+            {
+              "key": "doctorId",
+              "value": "{{doctorId}}"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Queue next success\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06A - Complete Appointment (status=Completed)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"Completed\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/appointments/{{appointmentId}}/status",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "appointments",
+            "{{appointmentId}}",
+            "status"
+          ]
+        }
+      }
+    },
+    {
+      "name": "06B - Mark NoShow (status=NoShow)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"NoShow\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/appointments/{{appointmentId}}/status",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "appointments",
+            "{{appointmentId}}",
+            "status"
+          ]
+        }
+      }
+    },
+    {
+      "name": "07 - Cancel Appointment",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reason\": \"Bệnh nhân bận việc cá nhân\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/appointments/{{appointmentId}}/cancel",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "appointments",
+            "{{appointmentId}}",
+            "cancel"
+          ]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3001/api"
+    },
+    {
+      "key": "patientEmail",
+      "value": "patient@example.com"
+    },
+    {
+      "key": "patientPassword",
+      "value": "123456"
+    },
+    {
+      "key": "doctorId",
+      "value": "1"
+    },
+    {
+      "key": "patientId",
+      "value": ""
+    },
+    {
+      "key": "patientToken",
+      "value": ""
+    },
+    {
+      "key": "appointmentId",
+      "value": ""
+    },
+    {
+      "key": "appointmentStartTime",
+      "value": "2026-05-06T09:30:00.000Z"
+    },
+    {
+      "key": "appointmentEndTime",
+      "value": "2026-05-06T10:00:00.000Z"
+    }
+  ]
+}

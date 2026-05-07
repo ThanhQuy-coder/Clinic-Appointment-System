@@ -11,6 +11,7 @@ const {
 } = require("./src/middlewares/error.middleware.js");
 const http = require("http");
 const socketServer = require("./src/sockets/socketServer.js");
+require("./src/queues/notificationWorker");
 // const { replayAppointments } = require("./src/scripts/replayAppointmentsToQueue.js");
 
 const app = express();
