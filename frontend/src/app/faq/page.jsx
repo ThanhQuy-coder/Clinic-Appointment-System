@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 export default function FAQ() {
     // Trạng thái lưu xem câu hỏi nào đang được mở (null nghĩa là đang đóng hết)
     const [openIndex, setOpenIndex] = useState(null);
+    const [query, setQuery] = useState('');
 
     // Hàm xử lý khi bấm vào một câu hỏi
     const toggleFAQ = (index) => {
@@ -36,38 +37,82 @@ export default function FAQ() {
         }
     ];
 
-    return (
-        <div className="bg-gray-50 min-h-screen py-16">
-            <div className="max-w-4xl mx-auto px-8">
+    const filteredFaqs = faqs.filter((f) => {
+        if (!query) return true;
+        const q = query.toLowerCase();
+        return (
+            f.question.toLowerCase().includes(q) ||
+            f.answer.toLowerCase().includes(q)
+        );
+    });
 
-                {/* Phần Tiêu đề */}
-                <div className="text-center mb-16">
-                    <h1 className="text-4xl font-bold text-[#0e6add] mb-4">Trợ giúp & Câu hỏi thường gặp</h1>
-                    <p className="text-gray-600 text-lg">
-                        Tìm câu trả lời nhanh chóng cho các thắc mắc phổ biến về dịch vụ đặt lịch khám.
+    return (
+        <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 min-h-screen py-14">
+            <div className="max-w-5xl mx-auto px-5 md:px-8">
+
+                {/* Header */}
+                <div className="text-center mb-10">
+                    <div className="inline-flex items-center gap-2 rounded-full bg-blue-600/10 text-blue-700 px-3 py-1 text-sm mb-4">
+                        Trung tâm trợ giúp
+                    </div>
+                    <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3">Trợ giúp & Câu hỏi thường gặp</h1>
+                    <p className="text-slate-600 text-base md:text-lg max-w-2xl mx-auto">
+                        Tìm câu trả lời nhanh chóng cho các thắc mắc phổ biến về đặt lịch khám và trải nghiệm bệnh nhân.
                     </p>
+                </div>
+
+                {/* Search */}
+                <div className="bg-white rounded-2xl shadow-lg border border-slate-100 p-4 md:p-5 mb-6">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Tìm kiếm</label>
+                    <div className="flex items-center gap-3">
+                        <input
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            placeholder="Nhập từ khóa: đặt lịch, hủy, thanh toán, bảo mật..."
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#0e6add]/30 focus:border-[#0e6add] outline-none transition-all"
+                        />
+                        {query && (
+                            <button
+                                type="button"
+                                onClick={() => setQuery('')}
+                                className="px-4 py-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-medium"
+                            >
+                                Xóa
+                            </button>
+                        )}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-2">Mẹo: bạn có thể tìm theo câu hỏi hoặc nội dung trả lời.</p>
                 </div>
 
                 {/* Khung chứa danh sách Accordion */}
                 <div className="space-y-4">
-                    {faqs.map((faq, index) => (
+                    {filteredFaqs.length === 0 && (
+                        <div className="bg-white rounded-2xl border border-slate-100 shadow-lg p-8 text-center">
+                            <p className="text-slate-700 font-semibold">Không tìm thấy câu trả lời phù hợp</p>
+                            <p className="text-slate-500 mt-2">Hãy thử từ khóa khác hoặc gửi yêu cầu hỗ trợ.</p>
+                            <a href="/contact" className="inline-flex mt-5 bg-[#0e6add] text-white font-semibold px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors">
+                                Liên hệ hỗ trợ
+                            </a>
+                        </div>
+                    )}
+                    {filteredFaqs.map((faq, index) => (
                         <div
                             key={index}
-                            className={`bg-white rounded-2xl border transition-all duration-300 overflow-hidden shadow-sm
-                ${openIndex === index ? 'border-[#0e6add]' : 'border-gray-200 hover:border-blue-300'}
+                            className={`bg-white rounded-2xl border transition-all duration-300 overflow-hidden shadow-lg
+                ${openIndex === index ? 'border-[#0e6add]' : 'border-slate-100 hover:border-blue-200'}
               `}
                         >
                             {/* Phần Câu hỏi (Clickable) */}
                             <button
                                 onClick={() => toggleFAQ(index)}
-                                className="w-full px-6 py-5 flex items-center justify-between text-left focus:outline-none"
+                                className="w-full px-5 md:px-6 py-5 flex items-center justify-between text-left focus:outline-none"
                             >
-                                <h3 className={`text-lg font-medium transition-colors duration-300 ${openIndex === index ? 'text-[#0e6add]' : 'text-gray-800'}`}>
+                                <h3 className={`text-base md:text-lg font-semibold transition-colors duration-300 ${openIndex === index ? 'text-[#0e6add]' : 'text-slate-900'}`}>
                                     {faq.question}
                                 </h3>
 
                                 {/* Icon Dấu + / Dấu - */}
-                                <div className={`flex-shrink-0 ml-4 w-8 h-8 rounded-full flex items-center justify-center transition-transform duration-300 ${openIndex === index ? 'bg-[#0e6add] text-white rotate-180' : 'bg-gray-100 text-gray-500'}`}>
+                                <div className={`flex-shrink-0 ml-4 w-9 h-9 rounded-full flex items-center justify-center transition-transform duration-300 ${openIndex === index ? 'bg-[#0e6add] text-white rotate-180' : 'bg-slate-100 text-slate-500'}`}>
                                     {openIndex === index ? (
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 12H4"></path></svg>
                                     ) : (
@@ -81,8 +126,8 @@ export default function FAQ() {
                                 className={`transition-all duration-300 ease-in-out ${openIndex === index ? 'max-h-96 opacity-100 pb-6 px-6' : 'max-h-0 opacity-0 px-6'
                                     }`}
                             >
-                                <div className="w-full h-px bg-gray-100 mb-4"></div>
-                                <p className="text-gray-600 leading-relaxed">
+                                <div className="w-full h-px bg-slate-100 mb-4"></div>
+                                <p className="text-slate-600 leading-relaxed">
                                     {faq.answer}
                                 </p>
                             </div>
@@ -91,12 +136,17 @@ export default function FAQ() {
                 </div>
 
                 {/* Khung liên hệ thêm */}
-                <div className="mt-12 text-center p-8 bg-blue-50 rounded-2xl border border-blue-100">
-                    <h3 className="text-xl font-bold text-gray-800 mb-2">Bạn vẫn cần hỗ trợ?</h3>
-                    <p className="text-gray-600 mb-6">Đội ngũ chăm sóc khách hàng của chúng tôi luôn sẵn sàng lắng nghe bạn.</p>
-                    <a href="/contact" className="inline-block bg-[#0e6add] text-white font-medium px-8 py-3 rounded-full hover:bg-blue-700 hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
-                        Gửi yêu cầu hỗ trợ
-                    </a>
+                <div className="mt-10 text-center p-8 bg-white rounded-2xl border border-slate-100 shadow-lg">
+                    <h3 className="text-xl font-bold text-slate-900 mb-2">Bạn vẫn cần hỗ trợ?</h3>
+                    <p className="text-slate-600 mb-6">Gửi yêu cầu, chúng tôi sẽ phản hồi sớm nhất có thể.</p>
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                        <a href="/contact" className="inline-flex items-center justify-center bg-[#0e6add] text-white font-semibold px-8 py-3 rounded-xl hover:bg-blue-700 hover:shadow-lg transition-all duration-300">
+                            Gửi yêu cầu hỗ trợ
+                        </a>
+                        <a href="/" className="inline-flex items-center justify-center bg-slate-100 text-slate-800 font-semibold px-8 py-3 rounded-xl hover:bg-slate-200 transition-colors">
+                            Về trang chủ
+                        </a>
+                    </div>
                 </div>
 
             </div>

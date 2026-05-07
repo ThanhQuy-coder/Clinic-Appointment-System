@@ -20,14 +20,13 @@ class QueueManager {
     // Ràng buộc cơ bản
     const queue = getQueueByDoctor(doctorId);
     const waitingJobs = await queue.getWaiting();
+    const activeJobs = await queue.getActive();
 
     if (!waitingJobs || waitingJobs.length === 0) {
       throw new Error("Hiện tại không có bệnh nhân");
     }
 
-    const activeJob = waitingJobs.find((j) => j.data.status === "ACTIVE");
-
-    if (activeJob) {
+    if (activeJobs.length > 0) {
       throw new Error("Chưa hoàn thành bệnh nhân hiện tại");
     }
 
@@ -109,8 +108,10 @@ class QueueManager {
    * @returns
    */
   async complete(doctorId, status) {
+    const finalStatus = status || "Completed";
     const queue = getQueueByDoctor(doctorId);
     const activeJobs = await queue.getActive();
+    const waitingJobs = await queue.getWaiting();
 
     // Lấy job active và chuyển sang complete
     const currentJob = activeJobs.find((j) => j.data.status === "ACTIVE");
@@ -121,7 +122,7 @@ class QueueManager {
 
     await currentJob.updateData({
       ...currentJob.data,
-      status, 
+      status: finalStatus, 
     });
 
     const job = activeJobs[0];
@@ -130,7 +131,7 @@ class QueueManager {
     }
     await job.moveToCompleted("DONE", workerToken, false);
 
-    const orderedJobs = activeJobs;
+    const orderedJobs = [currentJob, ...waitingJobs];
     const currentIndex = orderedJobs.findIndex((j) => j.id === currentJob.id);
     const jobsComplete = await queue.getCompleted();
     const currentNumber = jobsComplete.length + currentIndex + 1;
@@ -168,10 +169,10 @@ class QueueManager {
       yourNumber: -1,
       numberAhead: 0,
       waitTime: 0,
-      status,
+      status: finalStatus,
     });
 
-    if (status === "NoShow") {
+    if (finalStatus === "NoShow") {
       await notificationService.sendAppointmentMissed({
         userId: currentJob.data.patientId,
         appointmentId: currentJob.data.appointmentId,
@@ -188,7 +189,7 @@ class QueueManager {
       doctorId: currentJob.data.doctorId,
       patientId: currentJob.data.patientId,
       appointmentId: currentJob.data.appointmentId,
-      status,
+      status: finalStatus,
     };
   }
 
@@ -260,7 +261,7 @@ class QueueManager {
 
     if (!job) {
       console.log(`Không tìm thấy Job với ID: ${appointmentId}`);
-      throw new Error();
+      throw new Error("Không tìm thấy lịch hẹn trong hàng đợi");
     }
 
     const data = job.data;

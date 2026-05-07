@@ -21,13 +21,13 @@ class QueueController {
   }
 
   async complete(req, res) {
-    const { doctorId } = req.query;
+    const { doctorId, status = "Completed" } = req.query;
     if (!doctorId) {
       return res.status(400).json({message: "Thiếu doctorId"});
     }
 
     try {
-      const job = await queueManager.complete(doctorId);
+      const job = await queueManager.complete(doctorId, status);
 
       return res.json({
         message: "Đã hoàn tất khám",
@@ -39,8 +39,13 @@ class QueueController {
   }
 
   async current(req, res) {
+    const { doctorId } = req.query;
+    if (!doctorId) {
+      return res.status(400).json({ message: "Thiếu doctorId" });
+    }
+
     try {
-      const job = await queueManager.getCurrent();
+      const job = await queueManager.getCurrent(doctorId);
 
       return res.json({
         data: job,
@@ -53,7 +58,7 @@ class QueueController {
   async add(req, res) {
     const { doctorId, patientId, appointmentId } = req.body;
 
-    const job = await queueManager.addJob(doctorId, patientId, appointmentId);
+    const job = await queueManager.addJob({ doctorId, patientId, appointmentId });
 
     res.json({
       message: "Added",

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { io } from "socket.io-client";
-import { Calendar, Clock, User, Stethoscope, Bell, Timer, Users, XCircle, ChevronRight, CheckCircle, ArrowLeft, Search, Filter, CalendarDays, ListFilter, X } from "lucide-react";
+import { Calendar, Clock, User, Stethoscope, Bell, Timer, Users, XCircle, ChevronRight, CheckCircle, ArrowLeft, Search, Filter, CalendarDays, ListFilter, X, RefreshCw, Wifi, WifiOff } from "lucide-react";
 import api from "@/lib/axios";
 
 const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_URL_SOCKET || "http://localhost:3001";
@@ -37,6 +37,8 @@ export default function AppointmentListPage() {
     waitTime: 0,
   });
   const [queueLoading, setQueueLoading] = useState(false);
+  const [isSocketConnected, setIsSocketConnected] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   // ================= LẤY USER TỪ LOCALSTORAGE =================
   useEffect(() => {
@@ -66,29 +68,30 @@ export default function AppointmentListPage() {
   }, []);
 
   // ================= CALL API =================
-  useEffect(() => {
+  const fetchAppointments = async () => {
     if (!patientId) return;
 
-    const fetchData = async () => {
-      try {
-        const res = await api.get("/appointments", {
-          params: {
-            PatientId: patientId,
-            limit: 50,
-          },
-        });
+    try {
+      const res = await api.get("/appointments", {
+        params: {
+          PatientId: patientId,
+          limit: 50,
+        },
+      });
 
-        const appointments = res.data.data?.appointments || [];
-        setData(appointments);
-        setFilteredData(appointments);
-      } catch (err) {
-        console.error("❌ Lỗi gọi API:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
+      const appointments = res.data.data?.appointments || [];
+      setData(appointments);
+      setFilteredData(appointments);
+    } catch (err) {
+      console.error("❌ Lỗi gọi API:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchData();
+  useEffect(() => {
+    if (!patientId) return;
+    fetchAppointments();
   }, [patientId]);
 
   // ================= FILTER & SEARCH =================
@@ -141,6 +144,8 @@ export default function AppointmentListPage() {
       numberAhead: 0,
       waitTime: 0,
     });
+    setIsSocketConnected(false);
+    setLastUpdated(null);
     
     if (socketRef.current) {
       socketRef.current.disconnect();
@@ -178,11 +183,17 @@ export default function AppointmentListPage() {
       socketRef.current = socket;
 
       socket.on("connect", () => {
+        setIsSocketConnected(true);
         socket.emit("join", { userId: patientId, doctorId });
+      });
+
+      socket.on("disconnect", () => {
+        setIsSocketConnected(false);
       });
 
       socket.on("user:queue:update", (data) => {
         setQueueData(data);
+        setLastUpdated(new Date());
       });
 
     } catch (error) {
@@ -285,11 +296,22 @@ export default function AppointmentListPage() {
 
           <div className="bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden">
             <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-5 text-white">
-              <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
-                <Users className="w-6 h-6" />
-                Hàng đợi khám bệnh
-              </h2>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
+                  <Users className="w-6 h-6" />
+                  Hàng đợi khám bệnh
+                </h2>
+                <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${isSocketConnected ? "bg-emerald-500/20 text-emerald-100 border border-emerald-200/40" : "bg-white/20 text-white border border-white/30"}`}>
+                  {isSocketConnected ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
+                  {isSocketConnected ? "Đang realtime" : "Mất kết nối"}
+                </div>
+              </div>
               <p className="text-blue-100 text-sm mt-1">Cập nhật trực tiếp theo thời gian thực - {queueHeadline}</p>
+              {lastUpdated && (
+                <p className="text-blue-100/90 text-xs mt-1">
+                  Cập nhật lúc: {lastUpdated.toLocaleTimeString()}
+                </p>
+              )}
             </div>
 
             {queueLoading ? (
@@ -420,6 +442,15 @@ export default function AppointmentListPage() {
                 </span>
               </div>
             </div>
+          </div>
+          <div className="mt-4">
+            <button
+              onClick={fetchAppointments}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Tải lại danh sách
+            </button>
           </div>
         </div>
 
