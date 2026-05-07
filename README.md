@@ -1,52 +1,114 @@
 # Clinic Appointment System
 
-**Hệ thống đặt lịch khám bệnh / Quản lý phòng khám**
+Hệ thống đặt lịch khám bệnh (Patient/Doctor/Admin) với **queue realtime** và **notification realtime** (BullMQ + Redis + Socket.IO).
 
-![Clinic Appointment System Banner](https://static.vecteezy.com/system/resources/previews/016/928/590/non_2x/online-doctor-appointment-system-flat-banner-template-telehealth-services-iot-poster-leaflet-printable-color-designs-editable-flyer-page-with-text-space-vector.jpg)  
-_(Thay bằng ảnh chụp màn hình đẹp của hệ thống nếu có)_
+![Clinic Appointment System Banner](https://static.vecteezy.com/system/resources/previews/016/928/590/non_2x/online-doctor-appointment-system-flat-banner-template-telehealth-services-iot-poster-leaflet-printable-color-designs-editable-flyer-page-with-text-space-vector.jpg)
 
-## Giới thiệu
+## Tổng quan
 
-**Clinic Appointment System** là một hệ thống web giúp:
+- **Frontend**: Next.js (App Router) + TailwindCSS
+- **Backend**: Node.js + Express + Sequelize (MySQL)
+- **Realtime**: Socket.IO
+- **Queue/Jobs**: BullMQ + Redis
+- **Auth**: JWT
 
-- Bệnh nhân dễ dàng tìm kiếm bác sĩ, xem lịch trống và đặt lịch khám online
-- Bác sĩ / nhân viên phòng khám quản lý lịch hẹn, hồ sơ bệnh nhân, xác nhận/hủy lịch
-- Quản trị viên quản lý toàn bộ hệ thống (bác sĩ, dịch vụ, phòng khám, người dùng...)
+Repo gồm 2 phần:
 
-Mục tiêu: Giảm thời gian chờ đợi, tối ưu hóa lịch làm việc của bác sĩ, nâng cao trải nghiệm người dùng trong lĩnh vực y tế.
+- `backend/`: REST API + Socket.IO server + BullMQ workers
+- `frontend/`: UI cho bệnh nhân và trang quản trị
 
-## Tính năng chính
+## Tính năng nổi bật
 
-### Đối với Bệnh nhân (Patient)
+- **Đặt lịch khám** theo bác sĩ/khung giờ
+- **Theo dõi hàng đợi realtime** (trang `live-queue`)
+- **Thông báo realtime** cho người dùng (navbar)
+- **Nhắc lịch tự động** bằng delayed jobs (BullMQ delay)
 
-### Đối với Bác sĩ / Nhân viên phòng khám
-
-### Đối với Quản trị viên (Admin)
-
-## Công nghệ sử dụng
-
-| Phần             | Công nghệ                      |
-| ---------------- | ------------------------------ |
-| Frontend         | _Next.js / HTML + TailwindCSS_ |
-| Backend          | _Node.js + Express_            |
-| Database         | _MySQL_                        |
-| Authentication   | _JWT_                          |
-| State Management | _..._                          |
-| UI Library       | _Tailwind CSS_                 |
-| Tích hợp khác    | _..._                          |
-
-## Cài đặt & Chạy dự án (Local)
+## Chạy dự án (Local)
 
 ### Yêu cầu
 
-- (Công nghệ)
-- (Cơ sở dữ liệu)
-- Git
+- Node.js (khuyến nghị LTS)
+- MySQL
+- Redis (khuyến nghị chạy Docker)
 
-### Bước cài đặt
+### 1) Backend
+
+Xem hướng dẫn chi tiết: `backend/SETUP.md`
+
+Tóm tắt nhanh:
 
 ```bash
-# 1. Clone repository
-git clone https://github.com/ThanhQuy-coder/Clinic-Appointment-System.git
-cd clinic-appointment-system
+cd backend
+npm install
 ```
+
+Tạo file `backend/.env` (xem mục “Biến môi trường” bên dưới), chạy migrate:
+
+```bash
+cd backend
+npx sequelize-cli db:migrate
+```
+
+Chạy backend:
+
+```bash
+cd backend
+node index.js
+```
+
+Mặc định backend chạy ở `http://localhost:3001`.
+
+### 2) Redis (BullMQ)
+
+```bash
+docker run -d --name redis -p 6379:6379 redis
+```
+
+### 3) Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Mặc định frontend chạy ở `http://localhost:3000`.
+
+## Biến môi trường
+
+### Backend (`backend/.env`)
+
+```bash
+# MySQL
+CLINIC_DB_HOST=127.0.0.1
+CLINIC_DB_USER=root
+CLINIC_DB_PASS=
+CLINIC_DB_NAME=clinic
+CLINIC_DB_PORT=3306
+
+# Redis (BullMQ)
+IOREDIS_HOST=127.0.0.1
+IOREDIS_PORT=6379
+```
+
+### Frontend (`frontend/.env.local`)
+
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:3001/api
+NEXT_PUBLIC_URL_SOCKET=http://localhost:3001
+```
+
+## Realtime queue hoạt động thế nào?
+
+- Client (frontend) kết nối Socket.IO và `join` room:
+  - `user-{userId}`: nhận `user:queue:update`, `user:notification:new`
+  - `doctor-{doctorId}`: nhận `doctor:queue:update`
+- Backend phát event qua `backend/src/utils/emitter.js`
+- Queue flow nằm ở `backend/src/queues/queueManager.js`
+
+## Tài liệu theo module
+
+- Backend: xem `backend/README.md` và `backend/SETUP.md`
+- Frontend: xem `frontend/README.md`
+

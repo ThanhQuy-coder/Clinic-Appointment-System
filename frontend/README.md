@@ -1,36 +1,62 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Frontend - Clinic Appointment System
 
-## Getting Started
+Frontend là ứng dụng Next.js (App Router) phục vụ UI cho bệnh nhân và trang quản trị, tích hợp:
 
-First, run the development server:
+- REST API qua Axios (`src/lib/axios.js`)
+- Realtime qua Socket.IO client (queue + notifications)
+- TailwindCSS + Lucide icons
+
+## Chạy dự án
 
 ```bash
+cd frontend
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Mặc định chạy ở `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+## Biến môi trường
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Tạo file `frontend/.env.local`:
 
-## Learn More
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:3001/api
+NEXT_PUBLIC_URL_SOCKET=http://localhost:3001
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Các trang chính (tham khảo)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `/` (Home)
+- `/login`, `/register`
+- `/appointments` (danh sách lịch hẹn)
+- `/live-queue` (theo dõi hàng đợi realtime)
+- `/about`, `/contact`, `/faq`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Realtime
 
-## Deploy on Vercel
+### Queue realtime
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Trang `live-queue` kết nối socket và join:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```js
+socket.emit("join", { userId, doctorId })
+```
+
+Lắng nghe:
+
+- `user:queue:update`
+
+### Notifications realtime
+
+Navbar lắng nghe:
+
+- `user:notification:new`
+
+## Lint
+
+```bash
+cd frontend
+npm run lint
+```
+
