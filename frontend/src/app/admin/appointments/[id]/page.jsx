@@ -33,7 +33,7 @@ export default function AppointmentDetailPage() {
         const user = JSON.parse(savedUser);
         setCurrentUser(user);
         
-        if (user.Role !== 'Admin') {
+        if (!['Admin', 'Doctor'].includes(user.Role)) {
           toast.error('Bạn không có quyền truy cập trang này');
           router.push('/');
         }
@@ -47,7 +47,7 @@ export default function AppointmentDetailPage() {
   }, [router]);
 
   useEffect(() => {
-    if (appointmentId && currentUser?.Role === 'Admin') {
+    if (appointmentId && ['Admin', 'Doctor'].includes(currentUser?.Role)) {
       fetchAppointment();
     }
   }, [appointmentId, currentUser]);
@@ -56,7 +56,13 @@ export default function AppointmentDetailPage() {
     try {
       setLoading(true);
       const res = await axios.get(`/appointments/${appointmentId}`);
-      setAppointment(res.data.data);
+      const data = res.data.data;
+      if (currentUser?.Role === 'Doctor' && data?.DoctorId !== currentUser.Id) {
+        toast.error('Bạn không có quyền xem lịch hẹn này');
+        router.push('/admin/dashboard');
+        return;
+      }
+      setAppointment(data);
     } catch (err) {
       setError('Không thể tải thông tin lịch hẹn');
       console.error(err);
@@ -169,12 +175,12 @@ export default function AppointmentDetailPage() {
         <div className="flex items-center gap-3 mb-6 pb-6 border-b">
           <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
             <span className="text-blue-600 font-bold text-lg">
-              {appointment.patient?.user?.FullName?.charAt(0) || 'P'}
+              {(appointment.patient?.user?.FullName || appointment.Patient?.user?.FullName)?.charAt(0) || 'P'}
             </span>
           </div>
           <div>
             <h2 className="text-xl font-semibold text-gray-800">
-              {appointment.patient?.user?.FullName || 'Bệnh nhân'}
+              {appointment.patient?.user?.FullName || appointment.Patient?.user?.FullName || 'Bệnh nhân'}
             </h2>
             <p className="text-gray-500 text-sm">
               Mã lịch hẹn: {appointment.AppointmentId}
@@ -213,7 +219,7 @@ export default function AppointmentDetailPage() {
           <div>
             <h3 className="text-sm font-medium text-gray-500 mb-1">Bác sĩ</h3>
             <p className="text-gray-800">
-              {appointment.doctor?.user?.FullName || appointment.doctor?.FullName || '-'}
+              {appointment.doctor?.user?.FullName || appointment.Doctor?.user?.FullName || appointment.Doctor?.FullName || '-'}
             </p>
           </div>
           <div>
@@ -259,25 +265,25 @@ export default function AppointmentDetailPage() {
           <div>
             <p className="text-sm text-gray-500">Họ tên</p>
             <p className="text-gray-800 font-medium">
-              {appointment.patient?.user?.FullName || '-'}
+              {appointment.patient?.user?.FullName || appointment.Patient?.user?.FullName || '-'}
             </p>
           </div>
           <div>
             <p className="text-sm text-gray-500">Số điện thoại</p>
             <p className="text-gray-800">
-              {appointment.patient?.user?.Phone || '-'}
+              {appointment.patient?.user?.Phone || appointment.Patient?.user?.Phone || '-'}
             </p>
           </div>
           <div>
             <p className="text-sm text-gray-500">Email</p>
             <p className="text-gray-800">
-              {appointment.patient?.user?.Email || '-'}
+              {appointment.patient?.user?.Email || appointment.Patient?.user?.Email || '-'}
             </p>
           </div>
           <div>
             <p className="text-sm text-gray-500">Điểm uy tín</p>
             <p className="text-gray-800">
-              {appointment.patient?.ReliabilityScore ?? '-'}
+              {appointment.patient?.ReliabilityScore ?? appointment.Patient?.ReliabilityScore ?? '-'}
             </p>
           </div>
         </div>
