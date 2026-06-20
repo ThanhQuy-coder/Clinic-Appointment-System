@@ -11,23 +11,27 @@ const processNoShow = async (appointment, transaction) => {
     const gracePeriodEnd = new Date(startTime.getTime() + NO_SHOW_GRACE_PERIOD_MINUTES * 60000);
 
     if (now >= gracePeriodEnd && !appointment.ActualStartTime) {
-        await appointment.update({
-            Status: 'NoShow',
-        }, { transaction });
-
-        const patient = await Patient.findByPk(appointment.PatientId, { transaction });
-        if (patient) {
-            const newScore = Math.max(0, (patient.ReliabilityScore || 100) - NO_SHOW_PENALTY);
-            await patient.update({
-                NoShowCount: (patient.NoShowCount || 0) + 1,
-                ReliabilityScore: newScore,
-            }, { transaction });
-        }
-
+        await markNoShow(appointment, transaction);
         return true;
     }
 
     return false;
+};
+
+// Hàm riêng để đánh dấu NoShow (dùng cho admin bấm tay hoặc khi hết grace period)
+const markNoShow = async (appointment, transaction) => {
+    await appointment.update({
+        Status: 'NoShow',
+    }, { transaction });
+
+    const patient = await Patient.findByPk(appointment.PatientId, { transaction });
+    if (patient) {
+        const newScore = Math.max(0, (patient.ReliabilityScore || 100) - NO_SHOW_PENALTY);
+        await patient.update({
+            NoShowCount: (patient.NoShowCount || 0) + 1,
+            ReliabilityScore: newScore,
+        }, { transaction });
+    }
 };
 
 const runNoShowJob = async () => {
@@ -131,6 +135,7 @@ const markPatientArrival = async (appointmentId) => {
 module.exports = {
     runNoShowJob,
     processNoShow,
+    markNoShow,
     recalculateReliability,
     getPatientReliability,
     markPatientArrival,

@@ -68,7 +68,14 @@ export default function AppointmentDetailPage() {
   const handleUpdateStatus = async (newStatus) => {
     try {
       setUpdating(true);
-      await axios.patch(`/appointments/${appointmentId}/status`, { status: newStatus });
+      const payload = { status: newStatus };
+      
+      // Khi hoàn thành khám, tự động set ActualEndTime = now
+      if (newStatus === 'Completed') {
+        payload.actualEndTime = new Date().toISOString();
+      }
+      
+      await axios.patch(`/appointments/${appointmentId}/status`, payload);
       toast.success('Cập nhật trạng thái thành công');
       fetchAppointment();
     } catch (err) {
@@ -162,12 +169,12 @@ export default function AppointmentDetailPage() {
         <div className="flex items-center gap-3 mb-6 pb-6 border-b">
           <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
             <span className="text-blue-600 font-bold text-lg">
-              {appointment.Patient?.user?.FullName?.charAt(0) || 'P'}
+              {appointment.patient?.user?.FullName?.charAt(0) || 'P'}
             </span>
           </div>
           <div>
             <h2 className="text-xl font-semibold text-gray-800">
-              {appointment.Patient?.user?.FullName || 'Bệnh nhân'}
+              {appointment.patient?.user?.FullName || 'Bệnh nhân'}
             </h2>
             <p className="text-gray-500 text-sm">
               Mã lịch hẹn: {appointment.AppointmentId}
@@ -179,7 +186,7 @@ export default function AppointmentDetailPage() {
           {/* Thời gian */}
           <div>
             <h3 className="text-sm font-medium text-gray-500 mb-1">Ngày hẹn</h3>
-            <p className="text-gray-800">{formatDate(appointment.AppointmentDate)}</p>
+            <p className="text-gray-800">{formatDate(appointment.StartTime)}</p>
           </div>
           <div>
             <h3 className="text-sm font-medium text-gray-500 mb-1">Giờ hẹn</h3>
@@ -187,16 +194,32 @@ export default function AppointmentDetailPage() {
               {formatTime(appointment.StartTime)} - {formatTime(appointment.EndTime)}
             </p>
           </div>
+          {appointment.ActualStartTime && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">Giờ bắt đầu thực tế</h3>
+              <p className="text-green-600 font-medium">
+                {formatTime(appointment.ActualStartTime)}
+              </p>
+            </div>
+          )}
+          {appointment.ActualEndTime && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">Giờ kết thúc thực tế</h3>
+              <p className="text-red-600 font-medium">
+                {formatTime(appointment.ActualEndTime)}
+              </p>
+            </div>
+          )}
           <div>
             <h3 className="text-sm font-medium text-gray-500 mb-1">Bác sĩ</h3>
             <p className="text-gray-800">
-              {appointment.Doctor?.user?.FullName || appointment.Doctor?.FullName || '-'}
+              {appointment.doctor?.user?.FullName || appointment.doctor?.FullName || '-'}
             </p>
           </div>
           <div>
             <h3 className="text-sm font-medium text-gray-500 mb-1">Chuyên khoa</h3>
             <p className="text-gray-800">
-              {appointment.Department?.DepartmentName || appointment.DepartmentName || '-'}
+              {appointment.doctor?.Specialty || '-'}
             </p>
           </div>
           <div>
@@ -236,25 +259,25 @@ export default function AppointmentDetailPage() {
           <div>
             <p className="text-sm text-gray-500">Họ tên</p>
             <p className="text-gray-800 font-medium">
-              {appointment.Patient?.user?.FullName || '-'}
+              {appointment.patient?.user?.FullName || '-'}
             </p>
           </div>
           <div>
             <p className="text-sm text-gray-500">Số điện thoại</p>
             <p className="text-gray-800">
-              {appointment.Patient?.user?.Phone || '-'}
+              {appointment.patient?.user?.Phone || '-'}
             </p>
           </div>
           <div>
             <p className="text-sm text-gray-500">Email</p>
             <p className="text-gray-800">
-              {appointment.Patient?.user?.Email || '-'}
+              {appointment.patient?.user?.Email || '-'}
             </p>
           </div>
           <div>
             <p className="text-sm text-gray-500">Điểm uy tín</p>
             <p className="text-gray-800">
-              {appointment.Patient?.ReliabilityScore ?? '-'}
+              {appointment.patient?.ReliabilityScore ?? '-'}
             </p>
           </div>
         </div>
@@ -272,6 +295,13 @@ export default function AppointmentDetailPage() {
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
                 Xác nhận lịch hẹn
+              </button>
+              <button
+                onClick={() => handleUpdateStatus('NoShow')}
+                disabled={updating}
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
+              >
+                Không đến
               </button>
               <button
                 onClick={() => handleUpdateStatus('Cancelled')}

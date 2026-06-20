@@ -65,7 +65,7 @@ export default function AdminDashboardPage() {
     try {
       setLoading(true);
       const params = new URLSearchParams({
-        date: selectedDate,
+        Date: selectedDate,
         limit: 50,
       });
 

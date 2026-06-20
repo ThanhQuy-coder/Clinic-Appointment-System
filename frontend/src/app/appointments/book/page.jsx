@@ -42,7 +42,19 @@ export default function BookAppointmentPage() {
 
   // Set initial date on client only (avoid hydration mismatch)
   useEffect(() => {
-    setFormData(prev => ({ ...prev, date: new Date().toISOString().split('T')[0] }));
+    const now = new Date();
+    // Use local time for date (not UTC)
+    const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    
+    // Calculate next available time slot (rounded up to nearest 30 minutes)
+    const currentMinutes = now.getMinutes();
+    const roundedMinutes = currentMinutes < 30 ? 30 : 0;
+    let roundedHours = now.getHours();
+    if (currentMinutes >= 30) roundedHours += 1;
+    const localTime = `${String(roundedHours).padStart(2, '0')}:${String(roundedMinutes).padStart(2, '0')}`;
+    
+    setFormData(prev => ({ ...prev, date: localDate }));
+    setSelectedTime(localTime);
     setIsMounted(true);
   }, []);
 
@@ -101,6 +113,26 @@ export default function BookAppointmentPage() {
     setFormData({ ...formData, doctorId: suggestion.doctorId });
   };
 
+  // Handle date change - reset time if selecting past date
+  const handleDateChange = (newDate) => {
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    if (newDate === today) {
+      // If selecting today, ensure time is not in the past
+      const minTime = getMinTime();
+      const [minH, minM] = minTime.split(':').map(Number);
+      const [currH, currM] = selectedTime.split(':').map(Number);
+      const minMinutes = minH * 60 + minM;
+      const currMinutes = currH * 60 + currM;
+      if (currMinutes < minMinutes) {
+        setSelectedTime(minTime);
+      }
+    }
+
+    setFormData({ ...formData, date: newDate });
+  };
+
   const handleTimeChange = (e) => {
     setSelectedTime(e.target.value);
     setSelectedSuggestion(null); // Clear suggestion when manually selecting time
@@ -138,6 +170,13 @@ export default function BookAppointmentPage() {
     return `${String(endHours).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`;
   };
 
+  // Helper function to create date from date string and time string (handles timezone correctly)
+  const createLocalDateTime = (dateStr, timeStr) => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    return new Date(year, month - 1, day, hours, minutes, 0, 0);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -147,15 +186,21 @@ export default function BookAppointmentPage() {
       return;
     }
 
+    // Validate: cannot book in the past
+    const appointmentTime = createLocalDateTime(formData.date, selectedTime);
+    const now = new Date();
+    if (appointmentTime <= now) {
+      setError('Không thể đặt lịch trong quá khứ. Vui lòng chọn thời gian trong tương lai.');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
 
       const durationMinutes = formData.appointmentType === 'Emergency' ? 30 : 
                               formData.appointmentType === 'Follow-up' ? 20 : 30;
-      const [hours, minutes] = selectedTime.split(':').map(Number);
-      const startTime = new Date(formData.date);
-      startTime.setHours(hours, minutes, 0, 0);
+      const startTime = appointmentTime;
       const endTime = new Date(startTime.getTime() + durationMinutes * 60000);
 
       const payload = {
@@ -183,6 +228,20 @@ export default function BookAppointmentPage() {
     }
     const doctor = doctors.find(d => d.DoctorId === formData.doctorId);
     return doctor ? `${doctor.user?.FullName || 'Bác sĩ'} - ${doctor.Specialty}` : 'Chưa chọn';
+  };
+
+  // Get minimum time (current time + 30 minutes, in HH:MM format)
+  const getMinTime = () => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() + 30);
+    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  };
+
+  // Check if selected date is today
+  const isToday = () => {
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    return formData.date === today;
   };
 
   return (
@@ -229,7 +288,7 @@ export default function BookAppointmentPage() {
                 <input
                   type="date"
                   value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  onChange={(e) => handleDateChange(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -272,6 +331,7 @@ export default function BookAppointmentPage() {
                 <input
                   type="time"
                   value={selectedTime}
+                  min={isToday() ? getMinTime() : undefined}
                   onChange={handleTimeChange}
                   className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />

@@ -35,7 +35,10 @@ export default function Login() {
             // Save local storage 
             localStorage.setItem('accessToken', token);
             localStorage.setItem('user', JSON.stringify(user));
-            
+
+            // Dispatch event để Navbar cập nhật
+            window.dispatchEvent(new Event('user:login'));
+
             toast.success(`Chào mừng ${user?.name || user?.FullName || 'trở lại'}!`, { id: loadingToast });
 
             // Chuyển hướng dựa trên role

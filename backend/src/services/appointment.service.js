@@ -1,6 +1,7 @@
 const db = require('../models/index.js');
 const queueManager = require('../queues/queueManager.js');
 const notificationService = require('./notification.service.js');
+const noShowService = require('./noShow.service.js');
 const { Appointment, Doctor, WorkSchedule, DoctorLeave, Patient, sequelize } = db;
 const { Op, Transaction } = require('sequelize');
 
@@ -172,8 +173,18 @@ const getAppointments = async (filters) => {
 const getAppointmentById = async (appointmentId) => {
     return Appointment.findByPk(appointmentId, {
         include: [
-            { model: Doctor, as: 'doctor' },
-            { model: Patient, as: 'patient' },
+            {
+                model: Doctor,
+                as: 'doctor',
+                attributes: ['DoctorId', 'Specialty'],
+                include: [{ model: db.User, as: 'user', attributes: ['Id', 'FullName'] }],
+            },
+            {
+                model: Patient,
+                as: 'patient',
+                attributes: ['PatientId', 'ReliabilityScore'],
+                include: [{ model: db.User, as: 'user', attributes: ['Id', 'FullName', 'Phone', 'Email'] }],
+            },
         ],
     });
 };
@@ -262,11 +273,52 @@ const updateAppointmentStatus = async (appointmentId, status, actualStartTime = 
 
             // Hoàn thành hàng đợi nhưng status của patient là NoShow (trạng thái job trong queue ACTIVE --> COMPLETED)
             if (status === "NoShow") {
-                await queueManager.complete(appointment.DoctorId, status);
+                // NoShow không cần xử lý queue vì bệnh nhân chưa check-in
+                // Sử dụng processNoShow để cập nhật trạng thái và trừ điểm uy tín
+                await noShowService.processNoShow(appointment, transaction);
+                
+                // Gửi thông báo
+                try {
+                    await notificationService.sendAppointmentMissed({
+                        userId: appointment.PatientId,
+                        appointmentId: appointment.AppointmentId,
+                    });
+                } catch(err) {
+                    console.error('Failed to send no-show notification', { userId: appointment.PatientId, error: err });
+                }
+                
+                // Reload appointment để lấy thông tin mới nhất
+                await appointment.reload({ transaction });
+                return appointment;
             }
 
+            // Hủy lịch hẹn (xử lý trực tiếp thay vì gọi cancelAppointment để tránh transaction lồng nhau)
             if (status === "Cancelled") {
-                cancelAppointment(appointmentId, `Bác sĩ đã hủy cuộc hẹn:${appointmentId}`)
+                // Xử lý queue trước
+                try {
+                    await queueManager.cancel(appointmentId, appointment.DoctorId);
+                } catch(err) {
+                    console.error('Failed to cancel queue job', { doctorId: appointment.DoctorId, appointmentId, error: err });
+                }
+
+                // Cập nhật trạng thái
+                await appointment.update({
+                    Status: 'Cancelled',
+                    CancelledAt: new Date(),
+                    CancelReason: 'Bác sĩ đã hủy cuộc hẹn',
+                }, { transaction });
+
+                // Gửi thông báo (không throw lỗi để vẫn cập nhật được trạng thái)
+                try {
+                    await notificationService.sendAppointmentCancelled({
+                        userId: appointment.PatientId,
+                        appointmentId: appointment.AppointmentId,
+                    });
+                } catch(err) {
+                    console.error('Failed to send cancellation notification', { userId: appointment.PatientId, error: err });
+                }
+
+                return appointment;
             }
 
         } catch(error){

@@ -15,14 +15,27 @@ const Navbar = () => {
 
     useEffect(() => {
         // Kiểm tra xem user đã đăng nhập chưa (từ localStorage)
-        const savedUser = localStorage.getItem('user');
-        if (savedUser) {
-            try {
-                setUser(JSON.parse(savedUser));
-            } catch (e) {
-                console.error('Error parsing user data', e);
+        const loadUser = () => {
+            const savedUser = localStorage.getItem('user');
+            if (savedUser) {
+                try {
+                    setUser(JSON.parse(savedUser));
+                } catch (e) {
+                    console.error('Error parsing user data', e);
+                }
+            } else {
+                setUser(null);
             }
-        }
+        };
+
+        loadUser();
+
+        // Lắng nghe sự kiện storage change (khi login/logout thay đổi localStorage)
+        window.addEventListener('storage', loadUser);
+
+        // Lắng nghe custom event khi login thành công
+        window.addEventListener('user:login', loadUser);
+        window.addEventListener('user:logout', loadUser);
 
         // Hàm theo dõi sự kiện cuộn chuột
         const handleScroll = () => {
@@ -34,7 +47,13 @@ const Navbar = () => {
         };
 
         window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
+
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+            window.removeEventListener('storage', loadUser);
+            window.removeEventListener('user:login', loadUser);
+            window.removeEventListener('user:logout', loadUser);
+        };
     }, []);
 
     useEffect(() => {
@@ -92,8 +111,9 @@ const Navbar = () => {
                     <>
                         <Link href="/appointments" className="hover:text-[#0e6add] transition-colors">Lịch hẹn</Link>
                         {user.Role === 'Patient' && (
-                            <Link href="/dashboard" className="hover:text-[#0e6add] transition-colors">Dashboard</Link>,
-                            <Link href="/live-queue" className="hover:text-[#0e6add] transition-colors">Hàng đợi</Link>
+                            <>
+                                <Link href="/dashboard" className="hover:text-[#0e6add] transition-colors">Dashboard</Link>
+                            </>
                         )}
                         {(user.Role === 'Doctor' || user.Role === 'Admin') && (
                             <Link href="/admin/dashboard" className="hover:text-[#0e6add] transition-colors">Dashboard</Link>
@@ -108,19 +128,6 @@ const Navbar = () => {
                 {user ? (
                     <>
                         <div className="relative">
-                            <button
-                                onClick={() => setShowNotificationPanel((prev) => !prev)}
-                                className="relative px-3 py-2 rounded-full hover:bg-blue-50 transition-colors"
-                                aria-label="Thông báo"
-                            >
-                                <span className="text-lg">🔔</span>
-                                {notifications.length > 0 && (
-                                    <span className="absolute -top-1 -right-1 text-[10px] bg-red-500 text-white rounded-full min-w-4 h-4 px-1 flex items-center justify-center">
-                                        {notifications.length > 9 ? "9+" : notifications.length}
-                                    </span>
-                                )}
-                            </button>
-
                             {showNotificationPanel && (
                                 <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-auto bg-white border border-gray-200 rounded-xl shadow-xl z-50">
                                     <div className="px-4 py-3 border-b border-gray-100 font-semibold text-sm">

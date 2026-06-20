@@ -162,7 +162,7 @@ export default function AppointmentsPage() {
                     <div>
                       <p className="text-gray-500">Bác sĩ</p>
                       <p className="font-medium">
-                        {apt.Doctor?.user?.FullName || apt.Doctor?.Specialty || '-'}
+                        {apt.doctor?.user?.FullName || apt.doctor?.Specialty || '-'}
                       </p>
                     </div>
                     <div>
