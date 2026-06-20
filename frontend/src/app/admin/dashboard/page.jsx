@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import axios from '@/lib/axios';
 import toast, { Toaster } from 'react-hot-toast';
+import { io } from 'socket.io-client';
+
+const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_URL_SOCKET || 'http://localhost:3001';
 
 const statusLabels = {
   Pending: { text: 'Chờ xác nhận', color: 'bg-yellow-100 text-yellow-800' },
@@ -28,6 +31,10 @@ export default function AdminDashboardPage() {
     inProgress: 0,
     completed: 0,
   });
+  const [queueCurrent, setQueueCurrent] = useState(null);
+  const [queueLoading, setQueueLoading] = useState(false);
+  const [queueError, setQueueError] = useState(null);
+  const [queueConnected, setQueueConnected] = useState(false);
 
   const [currentUser, setCurrentUser] = useState(null);
 
@@ -56,18 +63,47 @@ export default function AdminDashboardPage() {
   }, [router]);
 
   useEffect(() => {
-    if (selectedDate && currentUser) {
+    if (currentUser) {
       fetchAppointments();
     }
   }, [filter, selectedDate, currentUser]);
+
+  useEffect(() => {
+    if (currentUser?.Role !== 'Doctor') return;
+
+    fetchDoctorCurrentQueue();
+
+    const socket = io(SOCKET_SERVER_URL);
+
+    socket.on('connect', () => {
+      setQueueConnected(true);
+      socket.emit('join', { userId: currentUser.Id, doctorId: currentUser.Id });
+    });
+
+    socket.on('disconnect', () => {
+      setQueueConnected(false);
+    });
+
+    socket.on('doctor:queue:update', () => {
+      fetchDoctorCurrentQueue();
+      fetchAppointments();
+    });
+
+    return () => {
+      socket.disconnect();
+      setQueueConnected(false);
+    };
+  }, [currentUser]);
 
   const fetchAppointments = async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams({
-        Date: selectedDate,
-        limit: 50,
+        limit: 1000,
       });
+      if (selectedDate) {
+        params.set('Date', selectedDate);
+      }
       if (currentUser?.Role === 'Doctor') {
         params.set('DoctorId', currentUser.Id);
       }
@@ -87,6 +123,22 @@ export default function AdminDashboardPage() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchDoctorCurrentQueue = async () => {
+    if (currentUser?.Role !== 'Doctor') return;
+
+    try {
+      setQueueLoading(true);
+      setQueueError(null);
+      const res = await axios.get(`/queue/current?doctorId=${currentUser.Id}`);
+      setQueueCurrent(res.data.data || null);
+    } catch (err) {
+      setQueueCurrent(null);
+      setQueueError(err.response?.data?.message || 'No active patient in queue');
+    } finally {
+      setQueueLoading(false);
     }
   };
 
@@ -135,6 +187,41 @@ export default function AdminDashboardPage() {
     return true;
   });
 
+  const currentQueueAppointment = queueCurrent?.appointmentId
+    ? appointments.find((apt) => String(apt.AppointmentId) === String(queueCurrent.appointmentId))
+    : null;
+
+  const nextConfirmedAppointment = appointments.find((apt) => apt.Status === 'Confirmed');
+
+  const handleCallNextPatient = async () => {
+    try {
+      const res = await axios.get(`/queue/next?doctorId=${currentUser.Id}`);
+      const nextJob = res.data.data;
+
+      if (!nextJob?.appointmentId) {
+        alert(res.data.message || 'No patient is waiting in this queue');
+        return;
+      }
+
+      await axios.patch(`/appointments/${nextJob.appointmentId}/status`, { status: 'InProgress' });
+      await fetchAppointments();
+      await fetchDoctorCurrentQueue();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Cannot call the next patient');
+    }
+  };
+
+  const handleFinishCurrentPatient = async (status) => {
+    const appointmentId = queueCurrent?.appointmentId || currentQueueAppointment?.AppointmentId;
+    if (!appointmentId) {
+      alert('No active patient in queue');
+      return;
+    }
+
+    await handleUpdateStatus(appointmentId, status);
+    await fetchDoctorCurrentQueue();
+  };
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <Toaster position="top-right" />
@@ -154,6 +241,96 @@ export default function AdminDashboardPage() {
           </div>
         )}
       </div>
+
+      {currentUser?.Role === 'Doctor' && (
+        <div className="bg-white rounded-lg shadow-sm p-5 mb-8 border border-blue-100">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800">Hàng đợi hiện tại</h2>
+              <p className="text-sm text-gray-500">
+                {queueConnected ? 'Đang cập nhật realtime' : 'Đang dùng dữ liệu tải lại thủ công'}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={fetchDoctorCurrentQueue}
+                disabled={queueLoading}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors text-sm"
+              >
+                Làm mới
+              </button>
+              <button
+                onClick={handleCallNextPatient}
+                disabled={queueLoading || !!queueCurrent}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm"
+              >
+                Gọi bệnh nhân tiếp theo
+              </button>
+            </div>
+          </div>
+
+          {queueLoading ? (
+            <div className="py-6 text-sm text-gray-500">Đang tải hàng đợi...</div>
+          ) : queueCurrent ? (
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4 items-center">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500">Bệnh nhân</p>
+                  <p className="font-semibold text-gray-800">
+                    {currentQueueAppointment?.patient?.user?.FullName ||
+                      currentQueueAppointment?.Patient?.user?.FullName ||
+                      queueCurrent.patientId ||
+                      '-'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Mã lịch</p>
+                  <p className="font-semibold text-gray-800">
+                    {queueCurrent.appointmentId || currentQueueAppointment?.AppointmentId || '-'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Giờ khám</p>
+                  <p className="font-semibold text-gray-800">
+                    {currentQueueAppointment?.StartTime ? formatTime(currentQueueAppointment.StartTime) : '-'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Còn chờ</p>
+                  <p className="font-semibold text-gray-800">
+                    {queueCurrent.numberAhead ?? 0} bệnh nhân
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => handleFinishCurrentPatient('Completed')}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                >
+                  Hoàn thành
+                </button>
+                <button
+                  onClick={() => handleFinishCurrentPatient('NoShow')}
+                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm"
+                >
+                  Không đến
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-3 py-4">
+              <p className="text-sm text-gray-500">
+                {queueError || 'Không có bệnh nhân đang khám.'}
+              </p>
+              {nextConfirmedAppointment && (
+                <p className="text-sm text-gray-600">
+                  Bệnh nhân tiếp theo: {nextConfirmedAppointment.patient?.user?.FullName || nextConfirmedAppointment.Patient?.user?.FullName || nextConfirmedAppointment.PatientId}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -190,8 +367,13 @@ export default function AdminDashboardPage() {
         >
           Hôm nay
         </button>
+        <button
+          onClick={() => setSelectedDate('')}
+          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+        >
+          Tất cả
+        </button>
       </div>
-
       {/* Filter */}
       <div className="flex gap-2 mb-6">
         {[

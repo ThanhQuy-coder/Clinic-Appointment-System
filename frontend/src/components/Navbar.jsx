@@ -26,6 +26,9 @@ const Navbar = () => {
     const [notifications, setNotifications] = useState([]);
     const [showNotificationPanel, setShowNotificationPanel] = useState(false);
 
+    const isStaff = user?.Role === 'Doctor' || user?.Role === 'Admin';
+    const logoHref = isStaff ? '/admin/dashboard' : '/';
+
     useEffect(() => {
         const loadUser = () => {
             const storedUser = getStoredUser();
@@ -87,27 +90,33 @@ const Navbar = () => {
             }`}
         >
             <div className="flex items-center">
-                <Link href="/" className="text-3xl font-bold text-[#0e6add]">
+                <Link href={logoHref} className="text-3xl font-bold text-[#0e6add]">
                     Hệ thống đặt lịch
                 </Link>
             </div>
 
             <div className="hidden md:flex items-center space-x-8 font-medium">
-                <Link href="/" className="hover:text-[#0e6add] transition-colors">Trang chủ</Link>
-                <Link href="/about" className="hover:text-[#0e6add] transition-colors">Giới thiệu</Link>
-                <Link href="/faq" className="hover:text-[#0e6add] transition-colors">Trợ giúp</Link>
-                <Link href="/contact" className="hover:text-[#0e6add] transition-colors">Liên hệ</Link>
+                {!isStaff && (
+                    <>
+                        <Link href="/" className="hover:text-[#0e6add] transition-colors">Trang chủ</Link>
+                        <Link href="/about" className="hover:text-[#0e6add] transition-colors">Giới thiệu</Link>
+                        <Link href="/faq" className="hover:text-[#0e6add] transition-colors">Trợ giúp</Link>
+                        <Link href="/contact" className="hover:text-[#0e6add] transition-colors">Liên hệ</Link>
+                    </>
+                )}
 
                 {user && (
                     <>
-                        <Link href="/appointments" className="hover:text-[#0e6add] transition-colors">Lịch hẹn</Link>
+                        {!isStaff && (
+                            <Link href="/appointments" className="hover:text-[#0e6add] transition-colors">Lịch hẹn</Link>
+                        )}
                         {user.Role === 'Patient' && (
                             <>
                                 <Link href="/dashboard" className="hover:text-[#0e6add] transition-colors">Dashboard</Link>
                                 <Link href="/live-queue" className="hover:text-[#0e6add] transition-colors">Hàng đợi</Link>
                             </>
                         )}
-                        {(user.Role === 'Doctor' || user.Role === 'Admin') && (
+                        {isStaff && (
                             <Link href="/admin/dashboard" className="hover:text-[#0e6add] transition-colors">Dashboard</Link>
                         )}
                     </>

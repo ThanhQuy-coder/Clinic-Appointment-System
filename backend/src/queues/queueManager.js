@@ -202,16 +202,23 @@ class QueueManager {
     const queue = getQueueByDoctor(doctorId);
 
     const activeJobs = await queue.getActive();
+    const waitingJobs = await queue.getWaiting();
+    const completedJobs = await queue.getCompleted();
 
     if (activeJobs.length === 0)
       throw new Error("Không có bệnh nhân đang khám");
 
     const job = activeJobs[0];
+    const waitingCount = waitingJobs.filter((j) => j.data.status === "WAITING").length;
 
     return {
       id: job.id,
       doctorId: job.data.doctorId,
       patientId: job.data.patientId,
+      appointmentId: job.data.appointmentId,
+      currentNumber: completedJobs.length + 1,
+      numberAhead: waitingCount,
+      waitTime: waitingCount * 15,
       status: "ACTIVE",
     };
   }
