@@ -1,40 +1,55 @@
-'use client'; // Dòng này cực kỳ quan trọng trong Next.js để sử dụng được các hiệu ứng cuộn/click
+'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { io } from "socket.io-client";
+import { io } from 'socket.io-client';
 
-const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_URL_SOCKET || "http://localhost:3001";
+const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_URL_SOCKET || 'http://localhost:3001';
+
+const getStoredUser = () => {
+    if (typeof window === 'undefined') return null;
+
+    const savedUser = localStorage.getItem('user');
+    if (!savedUser) return null;
+
+    try {
+        return JSON.parse(savedUser);
+    } catch (e) {
+        console.error('Error parsing user data', e);
+        return null;
+    }
+};
 
 const Navbar = () => {
-    // Biến state để lưu trạng thái xem đã cuộn chuột hay chưa
     const [isScrolled, setIsScrolled] = useState(false);
-    const [user, setUser] = useState(null);
+    const [user, setUser] = useState(getStoredUser);
     const [notifications, setNotifications] = useState([]);
     const [showNotificationPanel, setShowNotificationPanel] = useState(false);
 
     useEffect(() => {
-        // Kiểm tra xem user đã đăng nhập chưa (từ localStorage)
-        const savedUser = localStorage.getItem('user');
-        if (savedUser) {
-            try {
-                setUser(JSON.parse(savedUser));
-            } catch (e) {
-                console.error('Error parsing user data', e);
-            }
-        }
+        const loadUser = () => {
+            const storedUser = getStoredUser();
+            setUser(storedUser);
 
-        // Hàm theo dõi sự kiện cuộn chuột
-        const handleScroll = () => {
-            if (window.scrollY > 10) {
-                setIsScrolled(true);
-            } else {
-                setIsScrolled(false);
+            if (!storedUser) {
+                setNotifications([]);
+                setShowNotificationPanel(false);
             }
         };
 
+        const handleScroll = () => {
+            setIsScrolled(window.scrollY > 10);
+        };
+
         window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
+        window.addEventListener('storage', loadUser);
+        window.addEventListener('auth:changed', loadUser);
+
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+            window.removeEventListener('storage', loadUser);
+            window.removeEventListener('auth:changed', loadUser);
+        };
     }, []);
 
     useEffect(() => {
@@ -42,11 +57,11 @@ const Navbar = () => {
 
         const socket = io(SOCKET_SERVER_URL);
 
-        socket.on("connect", () => {
-            socket.emit("join", { userId: user.Id });
+        socket.on('connect', () => {
+            socket.emit('join', { userId: user.Id });
         });
 
-        socket.on("user:notification:new", (payload) => {
+        socket.on('user:notification:new', (payload) => {
             setNotifications((prev) => [payload, ...prev].slice(0, 10));
         });
 
@@ -59,41 +74,38 @@ const Navbar = () => {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('user');
         setUser(null);
+        window.dispatchEvent(new Event('auth:changed'));
         window.location.href = '/';
     };
 
     return (
         <nav
-            // Dùng 'sticky top-0' để thanh này luôn bám dính ở trên cùng
-            // Dùng toán tử 3 ngôi (isScrolled ? ... : ...) để đổi màu nền khi cuộn
-            className={`sticky top-0 z-50 flex items-center justify-between px-8 transition-all duration-300 text-black
-        ${isScrolled
-                    ? 'py-3 bg-white/70 backdrop-blur-md shadow-md' // Khi cuộn: Trong suốt 70% + Làm mờ (Kính) + Thu nhỏ padding
-                    : 'py-4 bg-white shadow-sm' // Khi ở trên cùng: Nền trắng đặc + Padding to hơn
-                }
-      `}
+            className={`sticky top-0 z-50 flex items-center justify-between px-8 transition-all duration-300 text-black ${
+                isScrolled
+                    ? 'py-3 bg-white/70 backdrop-blur-md shadow-md'
+                    : 'py-4 bg-white shadow-sm'
+            }`}
         >
-            {/* Cụm Logo */}
             <div className="flex items-center">
                 <Link href="/" className="text-3xl font-bold text-[#0e6add]">
                     Hệ thống đặt lịch
                 </Link>
             </div>
 
-            {/* Menu chính ở giữa */}
             <div className="hidden md:flex items-center space-x-8 font-medium">
                 <Link href="/" className="hover:text-[#0e6add] transition-colors">Trang chủ</Link>
                 <Link href="/about" className="hover:text-[#0e6add] transition-colors">Giới thiệu</Link>
                 <Link href="/faq" className="hover:text-[#0e6add] transition-colors">Trợ giúp</Link>
                 <Link href="/contact" className="hover:text-[#0e6add] transition-colors">Liên hệ</Link>
 
-                {/* Menu khi đã đăng nhập */}
                 {user && (
                     <>
                         <Link href="/appointments" className="hover:text-[#0e6add] transition-colors">Lịch hẹn</Link>
                         {user.Role === 'Patient' && (
-                            <Link href="/dashboard" className="hover:text-[#0e6add] transition-colors">Dashboard</Link>,
-                            <Link href="/live-queue" className="hover:text-[#0e6add] transition-colors">Hàng đợi</Link>
+                            <>
+                                <Link href="/dashboard" className="hover:text-[#0e6add] transition-colors">Dashboard</Link>
+                                <Link href="/live-queue" className="hover:text-[#0e6add] transition-colors">Hàng đợi</Link>
+                            </>
                         )}
                         {(user.Role === 'Doctor' || user.Role === 'Admin') && (
                             <Link href="/admin/dashboard" className="hover:text-[#0e6add] transition-colors">Dashboard</Link>
@@ -102,8 +114,6 @@ const Navbar = () => {
                 )}
             </div>
 
-            {/* Nút Đăng nhập bên phải */}
-            {/* Cụm nút Đăng ký & Đăng nhập bên phải */}
             <div className="flex items-center space-x-2">
                 {user ? (
                     <>
@@ -116,7 +126,7 @@ const Navbar = () => {
                                 <span className="text-lg">🔔</span>
                                 {notifications.length > 0 && (
                                     <span className="absolute -top-1 -right-1 text-[10px] bg-red-500 text-white rounded-full min-w-4 h-4 px-1 flex items-center justify-center">
-                                        {notifications.length > 9 ? "9+" : notifications.length}
+                                        {notifications.length > 9 ? '9+' : notifications.length}
                                     </span>
                                 )}
                             </button>
@@ -130,8 +140,8 @@ const Navbar = () => {
                                         <p className="px-4 py-6 text-sm text-gray-500">Chưa có thông báo mới.</p>
                                     ) : (
                                         notifications.map((item, idx) => (
-                                            <div key={`${item.sendingTime || ""}-${idx}`} className="px-4 py-3 border-b border-gray-50">
-                                                <p className="text-sm font-medium text-gray-800">{item.title || "Thông báo"}</p>
+                                            <div key={`${item.sendingTime || ''}-${idx}`} className="px-4 py-3 border-b border-gray-50">
+                                                <p className="text-sm font-medium text-gray-800">{item.title || 'Thông báo'}</p>
                                                 <p className="text-sm text-gray-600 mt-1">{item.message}</p>
                                             </div>
                                         ))

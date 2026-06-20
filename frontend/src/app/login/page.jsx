@@ -35,17 +35,16 @@ export default function Login() {
             // Save local storage 
             localStorage.setItem('accessToken', token);
             localStorage.setItem('user', JSON.stringify(user));
+            window.dispatchEvent(new Event('auth:changed'));
             
             toast.success(`Chào mừng ${user?.name || user?.FullName || 'trở lại'}!`, { id: loadingToast });
 
             // Chuyển hướng dựa trên role
-            setTimeout(() => {
-                if (user.Role === 'Patient') {
-                    router.push('/dashboard');
-                } else {
-                    router.push('/admin/dashboard');
-                }
-            }, 1000);
+            if (user.Role === 'Patient') {
+                router.push('/dashboard');
+            } else {
+                router.push('/admin/dashboard');
+            }
 
         } catch (error) {
             const message = error.response?.data?.message || 'Đăng nhập thất bại. Thử lại sau!';

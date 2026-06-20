@@ -172,8 +172,16 @@ const getAppointments = async (filters) => {
 const getAppointmentById = async (appointmentId) => {
     return Appointment.findByPk(appointmentId, {
         include: [
-            { model: Doctor, as: 'doctor' },
-            { model: Patient, as: 'patient' },
+            {
+                model: Doctor,
+                as: 'doctor',
+                include: [{ model: db.User, as: 'user', attributes: ['Id', 'FullName'] }],
+            },
+            {
+                model: Patient,
+                as: 'patient',
+                include: [{ model: db.User, as: 'user', attributes: ['Id', 'FullName', 'Phone', 'Email'] }],
+            },
         ],
     });
 };

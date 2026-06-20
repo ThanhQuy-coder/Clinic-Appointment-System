@@ -42,7 +42,7 @@ export default function AdminDashboardPage() {
         const user = JSON.parse(savedUser);
         setCurrentUser(user);
         
-        if (user.Role !== 'Admin') {
+        if (!['Admin', 'Doctor'].includes(user.Role)) {
           toast.error('Bạn không có quyền truy cập trang này');
           router.push('/');
         }
@@ -56,18 +56,21 @@ export default function AdminDashboardPage() {
   }, [router]);
 
   useEffect(() => {
-    if (selectedDate) {
+    if (selectedDate && currentUser) {
       fetchAppointments();
     }
-  }, [filter, selectedDate]);
+  }, [filter, selectedDate, currentUser]);
 
   const fetchAppointments = async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams({
-        date: selectedDate,
+        Date: selectedDate,
         limit: 50,
       });
+      if (currentUser?.Role === 'Doctor') {
+        params.set('DoctorId', currentUser.Id);
+      }
 
       const res = await axios.get(`/appointments?${params.toString()}`);
       const allAppointments = res.data.data?.appointments || [];
@@ -136,7 +139,9 @@ export default function AdminDashboardPage() {
     <div className="max-w-6xl mx-auto px-4 py-8">
       <Toaster position="top-right" />
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Dashboard Quản trị</h1>
+        <h1 className="text-2xl font-bold text-gray-800">
+          {currentUser?.Role === 'Doctor' ? 'Dashboard Bác sĩ' : 'Dashboard Quản trị'}
+        </h1>
         {currentUser && (
           <div className="flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-full">
             <div className="w-8 h-8 bg-[#0e6add] rounded-full flex items-center justify-center text-white font-semibold text-sm">
@@ -244,14 +249,14 @@ export default function AdminDashboardPage() {
                   </td>
                   <td className="px-4 py-3">
                     <p className="font-medium text-sm">
-                      {apt.Patient?.user?.FullName || apt.PatientId || '-'}
+                      {apt.patient?.user?.FullName || apt.Patient?.user?.FullName || apt.PatientId || '-'}
                     </p>
-                    {apt.Patient?.user?.Phone && (
-                      <p className="text-xs text-gray-500">{apt.Patient.user.Phone}</p>
+                    {(apt.patient?.user?.Phone || apt.Patient?.user?.Phone) && (
+                      <p className="text-xs text-gray-500">{apt.patient?.user?.Phone || apt.Patient.user.Phone}</p>
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm">
-                    {apt.Doctor?.user?.FullName || '-'}
+                    {apt.doctor?.user?.FullName || apt.Doctor?.user?.FullName || '-'}
                   </td>
                   <td className="px-4 py-3 text-sm">
                     {apt.AppointmentType || 'Khám thường'}
